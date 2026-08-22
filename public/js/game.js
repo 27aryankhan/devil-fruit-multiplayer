@@ -1,3 +1,25 @@
+// ==========================================
+// SECURITY: Client-Side Anti-Tamper & Blackout Shield
+// ==========================================
+function triggerSecurityLockdown(reason) {
+  console.warn('[SECURITY ALERT] Client tampering detected:', reason);
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.close(1008, 'Security Violation');
+  }
+  // Black out screen
+  document.body.innerHTML = `
+    <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000000;color:#ff3366;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;z-index:999999;text-align:center;padding:20px;">
+      <h1 style="font-size:2.2rem;margin-bottom:10px;letter-spacing:3px;">🚫 SECURITY LOCKDOWN</h1>
+      <p style="color:#ffffff;font-size:1.1rem;max-width:500px;line-height:1.6;">
+        Unusual activity or client tampering was detected. Connection terminated.
+      </p>
+      <div style="margin-top:20px;padding:8px 16px;background:#111;border:1px solid #333;border-radius:6px;color:#888;font-size:0.85rem;">
+        Shield Status: ACTIVE | Access Blocked
+      </div>
+    </div>
+  `;
+}
+
 // Game State Variables
 let gameState = 'LOBBY'; // LOBBY, PLAYING, GAMEOVER
 
@@ -644,7 +666,7 @@ function startGame() {
 
   updateHUD();
 
-  // Initialize Synthesizer audio and play music
+  // --- SOUND EFFECTS (Synthesized via Web Audio API) ---
   audio.init();
   audio.resumeContext();
   audio.startMusic();

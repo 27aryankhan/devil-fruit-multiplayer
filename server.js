@@ -129,8 +129,97 @@ function isPrivateHost(host) {
   return false;
 }
 
+// ============================================================
+// SECURITY: Threat Intelligence & IP Auto-Ban / Shield
+// ============================================================
+
+const BANNED_IPS = new Map(); // ip -> unbanTimestamp
+const BAN_DURATION_MS = 2 * 60 * 60 * 1000; // 2 hours auto-ban
+const ACTIVE_IP_CONNECTIONS = new Map(); // ip -> count
+const MAX_WS_PER_IP = 8; // Max concurrent WS connections from a single IP
+
+// Extract client IP through Cloudflare / Render reverse proxy
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.headers['cf-connecting-ip'] || req.socket.remoteAddress || 'unknown';
+}
+
+function isIpBanned(ip) {
+  if (!ip || ip === 'unknown' || ip === '127.0.0.1' || ip === 'localhost') return false;
+  if (!BANNED_IPS.has(ip)) return false;
+  const unbanTime = BANNED_IPS.get(ip);
+  if (Date.now() > unbanTime) {
+    BANNED_IPS.delete(ip);
+    return false;
+  }
+  return true;
+}
+
+function banIp(ip, reason) {
+  if (!ip || ip === 'unknown' || ip === '127.0.0.1' || ip === 'localhost') return;
+  BANNED_IPS.set(ip, Date.now() + BAN_DURATION_MS);
+  console.warn(`[SECURITY SHIELD] 🚫 Auto-banned IP ${ip} for 2 hours. Reason: ${reason}`);
+}
+
+// Patterns of malicious probing / fuzzing / AI exploit bots
+const MALICIOUS_PATTERNS = [
+  /\.\./,                  // Path traversal
+  /%2e%2e/i,              // Encoded path traversal
+  /\.env/i,                // Environment secrets probe
+  /\.git/i,                // Git folder probe
+  /\.php/i,                // PHP probes
+  /wp-admin/i,             // WordPress exploit scanners
+  /wp-content/i,
+  /wp-includes/i,
+  /xmlrpc\.php/i,
+  /eval\(/i,               // Code execution payloads
+  /base64_/i,
+  /<script/i,              // Raw script injection in URLs
+  /\.aws/i,                // Cloud credential probes
+  /\.ssh/i,
+  /\.config/i,
+  /actuator/i,             // Spring Boot actuator probes
+  /cgi-bin/i,
+  /shell\.php/i,
+  /cmd=/i,
+  /etc\/passwd/i,
+  /%00/                    // Null byte injection
+];
+
+function isMaliciousUrl(url) {
+  if (!url || typeof url !== 'string') return true;
+  return MALICIOUS_PATTERNS.some(pattern => pattern.test(url));
+}
+
 // Server request handler
 const server = http.createServer((req, res) => {
+  const clientIp = getClientIp(req);
+
+  // 1. Instantly drop banned IPs
+  if (isIpBanned(clientIp)) {
+    req.socket.destroy();
+    return;
+  }
+
+  // 2. HTTP Method Filtering (Only allow GET and HEAD)
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.writeHead(405, { 'Content-Type': 'text/plain', 'Allow': 'GET, HEAD' });
+    res.end('405 Method Not Allowed');
+    return;
+  }
+
+  // 3. Detect and ban automated scanners / malicious probes
+  if (isMaliciousUrl(req.url)) {
+    banIp(clientIp, `Malicious probe detected: ${req.url.substring(0, 50)}`);
+    res.writeHead(403, { 'Content-Type': 'text/plain' });
+    res.end('403 Forbidden - Access Denied');
+    req.socket.destroy();
+    return;
+  }
+
   // Apply security headers to every response
   setSecurityHeaders(res);
 
@@ -242,10 +331,28 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocket.Server({ server, maxPayload: 4096 });
 
 wss.on('connection', (ws, req) => {
-  console.log('New WebSocket connection established');
+  const clientIp = getClientIp(req);
+
+  // SECURITY: Block banned IPs from connecting to WebSocket
+  if (isIpBanned(clientIp)) {
+    ws.close(1008, 'Access Denied - Banned');
+    return;
+  }
+
+  // SECURITY: Prevent WebSocket connection flooding from a single IP
+  const currentConns = (ACTIVE_IP_CONNECTIONS.get(clientIp) || 0) + 1;
+  if (currentConns > MAX_WS_PER_IP) {
+    console.warn(`[SECURITY] Connection flood from ${clientIp}: ${currentConns} sockets. Terminating.`);
+    ws.close(1008, 'Too Many Connections');
+    return;
+  }
+  ACTIVE_IP_CONNECTIONS.set(clientIp, currentConns);
+
+  console.log(`New WebSocket connection established from ${clientIp}`);
 
   // SECURITY: Attach rate limiter to each connection
   ws._rateLimiter = createRateLimiter();
+  ws._violationCount = 0;
 
   // Disable Nagle's algorithm for immediate packet delivery (real-time responsiveness)
   if (req.socket) {
@@ -268,9 +375,12 @@ wss.on('connection', (ws, req) => {
   }
 
   ws.on('message', (message) => {
-    // SECURITY: Rate limiting — disconnect clients that send too many messages
+    // SECURITY: Rate limiting — disconnect and auto-ban clients that flood messages
     if (!ws._rateLimiter.check()) {
-      console.warn('Rate limit exceeded, closing connection');
+      ws._violationCount = (ws._violationCount || 0) + 1;
+      if (ws._violationCount > 3) {
+        banIp(clientIp, 'Excessive WebSocket message flooding');
+      }
       ws.close(1008, 'Rate limit exceeded');
       return;
     }
@@ -434,7 +544,15 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => {
-    console.log('Connection closed');
+    // Decrement active connection counter for this IP
+    const c = ACTIVE_IP_CONNECTIONS.get(clientIp) || 1;
+    if (c <= 1) {
+      ACTIVE_IP_CONNECTIONS.delete(clientIp);
+    } else {
+      ACTIVE_IP_CONNECTIONS.set(clientIp, c - 1);
+    }
+
+    console.log(`Connection closed for ${clientIp}`);
     if (ws === activeScreen) {
       activeScreen = null;
       console.log('Active game screen disconnected');

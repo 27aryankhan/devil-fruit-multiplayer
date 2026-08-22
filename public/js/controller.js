@@ -1,3 +1,25 @@
+// ==========================================
+// SECURITY: Client-Side Anti-Tamper & Blackout Shield
+// ==========================================
+function triggerSecurityLockdown(reason) {
+  console.warn('[SECURITY ALERT] Controller tampering detected:', reason);
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.close(1008, 'Security Violation');
+  }
+  // Black out screen
+  document.body.innerHTML = `
+    <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000000;color:#ff3366;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;z-index:999999;text-align:center;padding:20px;">
+      <h1 style="font-size:1.8rem;margin-bottom:10px;letter-spacing:2px;">🚫 CONTROLLER LOCKED</h1>
+      <p style="color:#ffffff;font-size:1rem;max-width:320px;line-height:1.5;">
+        Security policy violation or script tampering detected.
+      </p>
+      <div style="margin-top:18px;padding:6px 14px;background:#111;border:1px solid #333;border-radius:6px;color:#888;font-size:0.8rem;">
+        Shield Status: ACTIVE | Disconnected
+      </div>
+    </div>
+  `;
+}
+
 let socket;
 let playerId = null;
 let playerColor = '#ffffff';
