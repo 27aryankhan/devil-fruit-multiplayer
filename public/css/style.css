@@ -27,7 +27,7 @@ body {
   background: radial-gradient(circle at center, #1b2028 0%, #0d0f12 100%);
 }
 
-/* Lobby Container */
+/* Master Lobby Container & Two-Column Layout */
 #lobby {
   position: absolute;
   top: 0;
@@ -41,23 +41,58 @@ body {
   background: rgba(13, 15, 18, 0.45);
   backdrop-filter: blur(8px);
   transition: opacity 0.5s ease;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.lobby-wrapper {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: stretch;
+  gap: 24px;
+  width: 95%;
+  max-width: 1120px;
+  animation: cardEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (max-width: 960px) {
+  .lobby-wrapper {
+    flex-direction: column;
+    align-items: center;
+  }
 }
 
 .lobby-card {
-  width: 90%;
-  max-width: 780px;
-  background: rgba(23, 27, 34, 0.75);
+  flex: 1.3;
+  max-width: 640px;
+  width: 100%;
+  background: rgba(23, 27, 34, 0.78);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
-  border-radius: 32px;
-  padding: 40px;
+  border-radius: 28px;
+  padding: 32px;
   text-align: center;
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  animation: cardEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  gap: 20px;
+}
+
+.leaderboard-card {
+  flex: 0.95;
+  max-width: 440px;
+  width: 100%;
+  background: rgba(23, 27, 34, 0.78);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  border-radius: 28px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Typography & Titles */
@@ -234,36 +269,56 @@ body {
   white-space: nowrap;
 }
 
-/* Global Leaderboard Section */
-.leaderboard-section {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 16px;
-  padding: 16px;
+/* Global Leaderboard Card & Dedicated Side Panel */
+.leaderboard-card {
+  flex: 0.95;
+  max-width: 440px;
+  width: 100%;
+  background: rgba(23, 27, 34, 0.78);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  border-radius: 28px;
+  padding: 28px 24px;
   display: flex;
   flex-direction: column;
+  gap: 14px;
 }
 
 .lb-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
 }
 
-.lb-header h3 {
-  font-size: 1.05rem;
+.lb-title-wrap {
+  text-align: left;
+}
+
+.lb-title-wrap h3 {
+  font-size: 1.25rem;
   color: #fff;
   margin: 0;
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.lb-title-wrap .lb-subtitle {
+  font-size: 0.72rem;
+  color: #8a94a6;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: block;
+  margin-top: 2px;
 }
 
 .lb-tabs {
   display: flex;
   gap: 6px;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.45);
   padding: 4px;
   border-radius: 10px;
 }
@@ -272,9 +327,9 @@ body {
   background: transparent;
   border: none;
   color: #8a94a6;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -289,11 +344,10 @@ body {
 .lb-stats {
   display: flex;
   justify-content: space-between;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   color: #64748b;
-  padding-bottom: 8px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .lb-stats strong {
@@ -303,8 +357,8 @@ body {
 .lb-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  max-height: 180px;
+  gap: 8px;
+  max-height: 400px;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -321,20 +375,22 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
+  padding: 10px 14px;
   background: rgba(255, 255, 255, 0.03);
-  border-radius: 8px;
-  font-size: 0.82rem;
-  transition: background 0.2s ease;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  transition: all 0.2s ease;
 }
 
 .lb-row:hover {
   background: rgba(255, 255, 255, 0.07);
+  transform: translateX(2px);
 }
 
 .lb-row.rank-1 {
   background: rgba(255, 204, 51, 0.12);
-  border: 1px solid rgba(255, 204, 51, 0.3);
+  border: 1px solid rgba(255, 204, 51, 0.35);
+  box-shadow: 0 0 15px rgba(255, 204, 51, 0.1);
 }
 .lb-row.rank-2 {
   background: rgba(200, 210, 230, 0.1);
@@ -348,31 +404,31 @@ body {
 .lb-player-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   overflow: hidden;
 }
 
 .lb-rank {
   font-weight: 800;
-  width: 22px;
+  width: 24px;
   text-align: center;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
 }
 .lb-row.rank-1 .lb-rank { color: #ffcc33; }
 .lb-row.rank-2 .lb-rank { color: #d1d5db; }
 .lb-row.rank-3 .lb-rank { color: #f97316; }
 
 .lb-flag {
-  font-size: 1rem;
+  font-size: 1.15rem;
 }
 
 .lb-name {
-  font-weight: 600;
+  font-weight: 700;
   color: #f1f5f9;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 110px;
+  max-width: 140px;
 }
 
 .lb-score-info {
@@ -382,24 +438,26 @@ body {
 }
 
 .lb-combo {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: #33ff66;
   background: rgba(51, 255, 102, 0.1);
-  padding: 2px 5px;
-  border-radius: 4px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-weight: 700;
 }
 
 .lb-score {
   font-weight: 800;
   color: #fff;
   font-family: monospace;
+  font-size: 0.95rem;
 }
 
 .lb-loading, .lb-empty {
   text-align: center;
   color: #64748b;
-  font-size: 0.82rem;
-  padding: 20px 0;
+  font-size: 0.85rem;
+  padding: 30px 0;
 }
 
 /* High Score Celebration Banner in Game Over */

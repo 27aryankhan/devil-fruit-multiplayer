@@ -247,35 +247,48 @@ window.addEventListener('DOMContentLoaded', () => {
                              window.location.hostname !== '127.0.0.1';
         const controllerUrl = isLiveDomain ? `${window.location.origin}/controller.html` : data.controllerUrl;
 
-        document.getElementById('connection-url').innerText = controllerUrl;
-        document.getElementById('qr-loader').style.display = 'none';
+        const connUrlEl = document.getElementById('connection-url');
+        if (connUrlEl) connUrlEl.innerText = controllerUrl;
+        const qrLoaderEl = document.getElementById('qr-loader');
+        if (qrLoaderEl) qrLoaderEl.style.display = 'none';
 
         // Toggle UI panels
-        document.getElementById('online-instructions').style.display = 'block';
-        document.getElementById('offline-instructions').style.display = 'none';
+        const onlineInst = document.getElementById('online-instructions');
+        if (onlineInst) onlineInst.style.display = 'block';
+        const offlineInst = document.getElementById('offline-instructions');
+        if (offlineInst) offlineInst.style.display = 'none';
 
         // Draw QR Code
-        new QRious({
-          element: document.getElementById('qr-canvas'),
-          value: controllerUrl,
-          size: 300,
-          background: '#ffffff',
-          foreground: '#000000',
-          level: 'M'
-        });
+        const qrCanvas = document.getElementById('qr-canvas');
+        if (qrCanvas) {
+          new QRious({
+            element: qrCanvas,
+            value: controllerUrl,
+            size: 300,
+            background: '#ffffff',
+            foreground: '#000000',
+            level: 'M'
+          });
+        }
 
         // Connect to WebSocket Server
         initWebSocket(data.localIp);
       })
       .catch(err => {
         console.warn('Dojo server offline, retrying in 2 seconds...');
-        document.getElementById('connection-url').innerText = 'http://loading...';
-        document.getElementById('qr-loader').innerText = 'Offline - Waiting for Dojo Server...';
-        document.getElementById('qr-loader').style.display = 'block';
+        const connUrlEl = document.getElementById('connection-url');
+        if (connUrlEl) connUrlEl.innerText = 'http://loading...';
+        const qrLoaderEl = document.getElementById('qr-loader');
+        if (qrLoaderEl) {
+          qrLoaderEl.innerText = 'Offline - Waiting for Dojo Server...';
+          qrLoaderEl.style.display = 'block';
+        }
         
         // Toggle UI panels
-        document.getElementById('online-instructions').style.display = 'none';
-        document.getElementById('offline-instructions').style.display = 'block';
+        const onlineInst = document.getElementById('online-instructions');
+        if (onlineInst) onlineInst.style.display = 'none';
+        const offlineInst = document.getElementById('offline-instructions');
+        if (offlineInst) offlineInst.style.display = 'block';
         
         // Retry connection info fetch after 2 seconds
         setTimeout(tryConnect, 2000);
