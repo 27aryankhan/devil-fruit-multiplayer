@@ -123,9 +123,21 @@ const server = http.createServer((req, res) => {
   
   // API endpoint for screen/controller info
   if (filePath.startsWith('/api/connection-info')) {
-    const currentIp = getLocalIp();
-    const currentLocalUrl = `http://${currentIp}:${PORT}`;
-    const currentControllerUrl = `http://${currentIp}:${PORT}/controller.html`;
+    const host = req.headers.host;
+    const proto = req.headers['x-forwarded-proto'] || (req.socket.encrypted ? 'https' : 'http');
+    const isCloudHost = host && !host.includes('localhost') && !host.includes('127.0.0.1');
+
+    let currentLocalUrl, currentControllerUrl, currentIp;
+    if (isCloudHost) {
+      currentIp = host;
+      currentLocalUrl = `${proto}://${host}`;
+      currentControllerUrl = `${proto}://${host}/controller.html`;
+    } else {
+      currentIp = getLocalIp();
+      currentLocalUrl = `http://${currentIp}:${PORT}`;
+      currentControllerUrl = `http://${currentIp}:${PORT}/controller.html`;
+    }
+
     res.writeHead(200, { 
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*'

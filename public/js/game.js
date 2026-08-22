@@ -124,7 +124,12 @@ window.addEventListener('DOMContentLoaded', () => {
     fetch(`${apiHost}/api/connection-info`)
       .then(res => res.json())
       .then(data => {
-        document.getElementById('connection-url').innerText = data.controllerUrl;
+        const isLiveDomain = window.location.hostname && 
+                             window.location.hostname !== 'localhost' && 
+                             window.location.hostname !== '127.0.0.1';
+        const controllerUrl = isLiveDomain ? `${window.location.origin}/controller.html` : data.controllerUrl;
+
+        document.getElementById('connection-url').innerText = controllerUrl;
         document.getElementById('qr-loader').style.display = 'none';
 
         // Toggle UI panels
@@ -134,7 +139,7 @@ window.addEventListener('DOMContentLoaded', () => {
         // Draw QR Code
         new QRious({
           element: document.getElementById('qr-canvas'),
-          value: data.controllerUrl,
+          value: controllerUrl,
           size: 300,
           background: '#ffffff',
           foreground: '#000000',
