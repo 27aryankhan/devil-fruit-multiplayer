@@ -194,6 +194,49 @@ function isMaliciousUrl(url) {
   return MALICIOUS_PATTERNS.some(pattern => pattern.test(url));
 }
 
+// ============================================================
+// GLOBAL LEADERBOARD & PERSISTENCE
+// ============================================================
+const LEADERBOARD_FILE = path.join(__dirname, 'leaderboard.json');
+let leaderboardData = { classic: [], zen: [], stats: { totalMatches: 0, totalFruitsSliced: 0 } };
+
+function loadLeaderboard() {
+  try {
+    if (fs.existsSync(LEADERBOARD_FILE)) {
+      const raw = fs.readFileSync(LEADERBOARD_FILE, 'utf8');
+      leaderboardData = JSON.parse(raw);
+    }
+  } catch (err) {
+    console.error('Error loading leaderboard.json:', err);
+  }
+}
+
+function saveLeaderboard() {
+  try {
+    fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify(leaderboardData, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error saving leaderboard.json:', err);
+  }
+}
+
+// Initial load
+loadLeaderboard();
+
+// Convert 2-letter country code to Unicode Flag Emoji
+function countryCodeToFlag(cc) {
+  if (!cc || typeof cc !== 'string' || cc.length !== 2 || cc === 'GLOBAL' || cc === 'XX') return '🌐';
+  const upper = cc.toUpperCase();
+  const codePoints = [...upper].map(c => 127397 + c.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+}
+
+function getClientCountry(req) {
+  return req.headers['cf-ipcountry'] || 
+         req.headers['x-country-code'] || 
+         req.headers['geoip-country-code'] || 
+         'GLOBAL';
+}
+
 // Server request handler
 const server = http.createServer((req, res) => {
   const clientIp = getClientIp(req);
@@ -204,9 +247,9 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 2. HTTP Method Filtering (Only allow GET and HEAD)
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    res.writeHead(405, { 'Content-Type': 'text/plain', 'Allow': 'GET, HEAD' });
+  // 2. HTTP Method Filtering (Allow GET, HEAD, and POST for leaderboard submissions)
+  if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'text/plain', 'Allow': 'GET, HEAD, POST' });
     res.end('405 Method Not Allowed');
     return;
   }
@@ -254,6 +297,111 @@ const server = http.createServer((req, res) => {
       controllerUrl: currentControllerUrl,
       localIp: currentIp
     }));
+    return;
+  }
+
+  // API: Get Leaderboard
+  if (filePath.startsWith('/api/leaderboard') && req.method === 'GET') {
+    const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const mode = urlObj.searchParams.get('mode') === 'zen' ? 'zen' : 'classic';
+    const list = (leaderboardData[mode] || []).slice(0, 10).map((entry, idx) => ({
+      rank: idx + 1,
+      name: entry.name,
+      score: entry.score,
+      combo: entry.combo || 0,
+      country: entry.country || 'GLOBAL',
+      flag: countryCodeToFlag(entry.country),
+      date: entry.date
+    }));
+
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    });
+    res.end(JSON.stringify({
+      mode,
+      leaderboard: list,
+      stats: leaderboardData.stats || { totalMatches: 0, totalFruitsSliced: 0 }
+    }));
+    return;
+  }
+
+  // API: Submit High Score
+  if (filePath === '/api/leaderboard/submit' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk;
+      if (body.length > 2048) { // Security: 2KB max payload
+        req.socket.destroy();
+      }
+    });
+
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body);
+        const name = sanitizePlayerName(payload.name);
+        const score = parseInt(payload.score, 10);
+        const combo = parseInt(payload.combo, 10) || 0;
+        const mode = payload.mode === 'zen' ? 'zen' : 'classic';
+        const duration = Math.max(1, parseInt(payload.duration, 10) || 1);
+        const fruitsSliced = parseInt(payload.fruitsSliced, 10) || 0;
+
+        // Anti-Cheat: Validate realistic score range
+        if (isNaN(score) || score < 0 || score > 3500) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Invalid score' }));
+          return;
+        }
+
+        // Anti-Cheat: Max slice rate cannot exceed 25 fruits/sec
+        if (score / duration > 25 && score > 50) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Abnormal score rate' }));
+          return;
+        }
+
+        const country = getClientCountry(req);
+        const newEntry = {
+          id: Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+          name,
+          score,
+          combo,
+          country,
+          date: new Date().toISOString().split('T')[0]
+        };
+
+        if (!leaderboardData[mode]) leaderboardData[mode] = [];
+        leaderboardData[mode].push(newEntry);
+        leaderboardData[mode].sort((a, b) => b.score - a.score);
+        leaderboardData[mode] = leaderboardData[mode].slice(0, 50); // Keep top 50
+
+        // Update overall stats
+        leaderboardData.stats = leaderboardData.stats || { totalMatches: 0, totalFruitsSliced: 0 };
+        leaderboardData.stats.totalMatches = (leaderboardData.stats.totalMatches || 0) + 1;
+        leaderboardData.stats.totalFruitsSliced = (leaderboardData.stats.totalFruitsSliced || 0) + Math.max(0, fruitsSliced);
+
+        saveLeaderboard();
+
+        const rank = leaderboardData[mode].findIndex(e => e.id === newEntry.id) + 1;
+        const isTop10 = rank > 0 && rank <= 10;
+        const isNewRecord = rank === 1;
+
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        });
+        res.end(JSON.stringify({
+          success: true,
+          rank,
+          isTop10,
+          isNewRecord,
+          flag: countryCodeToFlag(country)
+        }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Bad Request' }));
+      }
+    });
     return;
   }
   

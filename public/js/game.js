@@ -65,9 +65,105 @@ let spawnInterval = null;
 let lastTime = 0;
 let screenShake = 0;
 
+// Leaderboard & Match tracking
+let currentLeaderboardMode = 'classic';
+let matchStartTime = 0;
+let matchFruitsSliced = 0;
+const maxCombosAchieved = {};
+
 // Spawning difficulty controls
 let fruitSpawnRate = 1800; // ms between spawns
 let baseGravity = 0.35;
+
+// --- GLOBAL LEADERBOARD FUNCTIONS ---
+
+function switchLeaderboardTab(mode) {
+  currentLeaderboardMode = mode;
+  const tabClassic = document.getElementById('lb-tab-classic');
+  const tabZen = document.getElementById('lb-tab-zen');
+  if (tabClassic) tabClassic.classList.toggle('active', mode === 'classic');
+  if (tabZen) tabZen.classList.toggle('active', mode === 'zen');
+  fetchLeaderboard(mode);
+}
+
+function fetchLeaderboard(mode = currentLeaderboardMode) {
+  const isFile = window.location.protocol === 'file:';
+  const apiBase = isFile ? 'http://localhost:3000' : '';
+  
+  fetch(`${apiBase}/api/leaderboard?mode=${mode}`)
+    .then(res => res.json())
+    .then(data => {
+      renderLeaderboard(data.leaderboard, data.stats);
+    })
+    .catch(err => {
+      console.warn('Leaderboard fetch notice:', err);
+      const list = document.getElementById('lb-list');
+      if (list) {
+        list.innerHTML = '<div class="lb-empty">⚔️ Global Leaderboard Active</div>';
+      }
+    });
+}
+
+function renderLeaderboard(items, stats) {
+  if (stats) {
+    const matchesEl = document.getElementById('stat-matches');
+    const fruitsEl = document.getElementById('stat-fruits');
+    if (matchesEl) matchesEl.innerText = stats.totalMatches || 0;
+    if (fruitsEl) fruitsEl.innerText = stats.totalFruitsSliced || 0;
+  }
+
+  const list = document.getElementById('lb-list');
+  if (!list) return;
+  list.innerHTML = '';
+
+  if (!items || items.length === 0) {
+    list.innerHTML = '<div class="lb-empty">No records yet. Be the first!</div>';
+    return;
+  }
+
+  items.forEach(item => {
+    const row = document.createElement('div');
+    row.className = `lb-row rank-${item.rank}`;
+
+    const playerInfo = document.createElement('div');
+    playerInfo.className = 'lb-player-info';
+
+    const rankSpan = document.createElement('span');
+    rankSpan.className = 'lb-rank';
+    rankSpan.textContent = item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : `#${item.rank}`;
+
+    const flagSpan = document.createElement('span');
+    flagSpan.className = 'lb-flag';
+    flagSpan.textContent = item.flag || '🌐';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'lb-name';
+    nameSpan.textContent = item.name;
+
+    playerInfo.appendChild(rankSpan);
+    playerInfo.appendChild(flagSpan);
+    playerInfo.appendChild(nameSpan);
+
+    const scoreInfo = document.createElement('div');
+    scoreInfo.className = 'lb-score-info';
+
+    if (item.combo && item.combo > 1) {
+      const comboSpan = document.createElement('span');
+      comboSpan.className = 'lb-combo';
+      comboSpan.textContent = `${item.combo}x`;
+      scoreInfo.appendChild(comboSpan);
+    }
+
+    const scoreSpan = document.createElement('span');
+    scoreSpan.className = 'lb-score';
+    scoreSpan.textContent = `${item.score} pts`;
+    scoreInfo.appendChild(scoreSpan);
+
+    row.appendChild(playerInfo);
+    row.appendChild(scoreInfo);
+    list.appendChild(row);
+  });
+}
 
 // Player colors mapping (same as server.js)
 const PLAYER_COLORS = {
@@ -188,6 +284,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   tryConnect();
   setupDesktopInput();
+  fetchLeaderboard('classic');
 
   // Start Animation Loop
   requestAnimationFrame(gameLoop);
@@ -640,12 +737,17 @@ function startGame() {
   backgroundSplats = [];
   floatingTexts = [];
   
+  // Leaderboard Match Stats
+  matchStartTime = Date.now();
+  matchFruitsSliced = 0;
+
   // Reset player scores and re-initialize per-player trail trackers
   Object.keys(players).forEach(pId => {
     players[pId].score = 0;
     playerScores[pId] = 0;
     delete playerSlashes[pId];
     players[pId].activeCombo = [];
+    maxCombosAchieved[pId] = 0;
     if (players[pId].comboTimer) {
       clearTimeout(players[pId].comboTimer);
       players[pId].comboTimer = null;
@@ -715,6 +817,7 @@ function returnToLobby() {
   document.getElementById('lobby').classList.remove('hidden');
   document.getElementById('hud').classList.add('hidden');
   audio.stopMusic();
+  fetchLeaderboard(gameMode);
 }
 
 function endGame() {
@@ -730,6 +833,11 @@ function endGame() {
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('game-over').classList.remove('hidden');
   document.getElementById('final-mode-subtitle').innerText = `${gameMode.toUpperCase()} MODE`;
+
+  // Reset high score banner
+  const recordBanner = document.getElementById('new-record-banner');
+  const recordText = document.getElementById('record-text');
+  if (recordBanner) recordBanner.classList.add('hidden');
 
   // Display Scoreboard
   const table = document.getElementById('results-table');
@@ -777,6 +885,43 @@ function endGame() {
       row.appendChild(playerDiv);
       row.appendChild(scoreDiv);
       table.appendChild(row);
+    });
+
+    // Submit match scores to Global Leaderboard
+    const matchDuration = Math.max(1, Math.round((Date.now() - matchStartTime) / 1000));
+    const isFile = window.location.protocol === 'file:';
+    const apiBase = isFile ? 'http://localhost:3000' : '';
+
+    sortedPlayers.forEach(p => {
+      const pScore = playerScores[p.id] || 0;
+      if (pScore > 0) {
+        fetch(`${apiBase}/api/leaderboard/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: p.name,
+            score: pScore,
+            combo: maxCombosAchieved[p.id] || 0,
+            mode: gameMode,
+            duration: matchDuration,
+            fruitsSliced: matchFruitsSliced
+          })
+        })
+        .then(res => res.json())
+        .then(resData => {
+          if (resData.success && resData.isTop10) {
+            if (recordBanner && recordText) {
+              recordText.innerText = resData.isNewRecord 
+                ? `👑 NEW #1 GLOBAL RECORD! (${pScore} pts)` 
+                : `🏆 NEW GLOBAL TOP 10 RECORD! (Rank #${resData.rank})`;
+              recordBanner.classList.remove('hidden');
+            }
+            audio.playHighscoreFanfare();
+            fetchLeaderboard(gameMode);
+          }
+        })
+        .catch(err => console.warn('Score submission notice:', err));
+      }
     });
   }
 
@@ -929,7 +1074,8 @@ function sliceFruit(fruit, playerId, position) {
   const player = players[playerId];
   if (!player) return;
 
-  // Add to player's score
+  // Add to player's score and match fruits total
+  matchFruitsSliced++;
   player.score += fruit.points;
   playerScores[playerId] = (playerScores[playerId] || 0) + fruit.points;
   audio.playSplat();
@@ -1010,6 +1156,7 @@ function checkCombo(playerId) {
   if (!player || player.activeCombo.length < 3) return;
 
   const count = player.activeCombo.length;
+  maxCombosAchieved[playerId] = Math.max(maxCombosAchieved[playerId] || 0, count);
   const comboBonus = count; // bonus points equal to combo size
   player.score += comboBonus;
   playerScores[playerId] = (playerScores[playerId] || 0) + comboBonus;

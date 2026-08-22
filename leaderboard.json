@@ -1,0 +1,98 @@
+{
+  "classic": [
+    {
+      "id": "mt3xfy30ml0i",
+      "name": "AryanKhan",
+      "score": 360,
+      "combo": 11,
+      "country": "GLOBAL",
+      "date": "2026-08-22"
+    },
+    {
+      "id": "init-1",
+      "name": "AkiraBlade",
+      "score": 342,
+      "combo": 9,
+      "country": "JP",
+      "date": "2026-08-20"
+    },
+    {
+      "id": "init-2",
+      "name": "RajputSlayer",
+      "score": 298,
+      "combo": 7,
+      "country": "IN",
+      "date": "2026-08-21"
+    },
+    {
+      "id": "init-3",
+      "name": "NeonKatana",
+      "score": 265,
+      "combo": 6,
+      "country": "US",
+      "date": "2026-08-21"
+    },
+    {
+      "id": "init-4",
+      "name": "Valkyrie",
+      "score": 210,
+      "combo": 5,
+      "country": "GB",
+      "date": "2026-08-22"
+    },
+    {
+      "id": "init-5",
+      "name": "ShadowNinja",
+      "score": 185,
+      "combo": 4,
+      "country": "DE",
+      "date": "2026-08-22"
+    }
+  ],
+  "zen": [
+    {
+      "id": "init-z1",
+      "name": "SakuraSpeed",
+      "score": 480,
+      "combo": 12,
+      "country": "JP",
+      "date": "2026-08-20"
+    },
+    {
+      "id": "init-z2",
+      "name": "VortexSlash",
+      "score": 435,
+      "combo": 10,
+      "country": "IN",
+      "date": "2026-08-21"
+    },
+    {
+      "id": "init-z3",
+      "name": "CyberSamurai",
+      "score": 390,
+      "combo": 8,
+      "country": "US",
+      "date": "2026-08-21"
+    },
+    {
+      "id": "init-z4",
+      "name": "BladeMaster",
+      "score": 340,
+      "combo": 7,
+      "country": "FR",
+      "date": "2026-08-22"
+    },
+    {
+      "id": "init-z5",
+      "name": "GhostReaper",
+      "score": 315,
+      "combo": 6,
+      "country": "KR",
+      "date": "2026-08-22"
+    }
+  ],
+  "stats": {
+    "totalMatches": 129,
+    "totalFruitsSliced": 4870
+  }
+}

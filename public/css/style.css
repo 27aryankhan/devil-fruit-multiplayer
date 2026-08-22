@@ -161,31 +161,47 @@ body {
   display: inline-block;
 }
 
-/* Connected Players Grid */
-.players-section h3 {
-  font-size: 1.1rem;
-  color: #f3f4f6;
-  margin-bottom: 14px;
+/* Lobby Grid: Split between Players & Leaderboard */
+.lobby-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
   text-align: left;
-  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .lobby-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Connected Players Grid */
+.players-section {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+}
+
+.players-section h3 {
+  font-size: 1.05rem;
+  color: #f3f4f6;
+  margin-bottom: 12px;
+  font-weight: 600;
 }
 
 .players-list {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
 .player-slot {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px;
+  padding: 12px 14px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 16px;
+  border-radius: 14px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: left;
 }
@@ -216,6 +232,198 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Global Leaderboard Section */
+.leaderboard-section {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.lb-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lb-header h3 {
+  font-size: 1.05rem;
+  color: #fff;
+  margin: 0;
+  font-weight: 700;
+}
+
+.lb-tabs {
+  display: flex;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 4px;
+  border-radius: 10px;
+}
+
+.lb-tab {
+  background: transparent;
+  border: none;
+  color: #8a94a6;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lb-tab.active {
+  background: #ff3366;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(255, 51, 102, 0.4);
+}
+
+.lb-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #64748b;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.lb-stats strong {
+  color: #94a3b8;
+}
+
+.lb-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.lb-list::-webkit-scrollbar {
+  width: 4px;
+}
+.lb-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+.lb-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  transition: background 0.2s ease;
+}
+
+.lb-row:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.lb-row.rank-1 {
+  background: rgba(255, 204, 51, 0.12);
+  border: 1px solid rgba(255, 204, 51, 0.3);
+}
+.lb-row.rank-2 {
+  background: rgba(200, 210, 230, 0.1);
+  border: 1px solid rgba(200, 210, 230, 0.25);
+}
+.lb-row.rank-3 {
+  background: rgba(205, 127, 50, 0.1);
+  border: 1px solid rgba(205, 127, 50, 0.25);
+}
+
+.lb-player-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.lb-rank {
+  font-weight: 800;
+  width: 22px;
+  text-align: center;
+  font-size: 0.85rem;
+}
+.lb-row.rank-1 .lb-rank { color: #ffcc33; }
+.lb-row.rank-2 .lb-rank { color: #d1d5db; }
+.lb-row.rank-3 .lb-rank { color: #f97316; }
+
+.lb-flag {
+  font-size: 1rem;
+}
+
+.lb-name {
+  font-weight: 600;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+}
+
+.lb-score-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lb-combo {
+  font-size: 0.72rem;
+  color: #33ff66;
+  background: rgba(51, 255, 102, 0.1);
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.lb-score {
+  font-weight: 800;
+  color: #fff;
+  font-family: monospace;
+}
+
+.lb-loading, .lb-empty {
+  text-align: center;
+  color: #64748b;
+  font-size: 0.82rem;
+  padding: 20px 0;
+}
+
+/* High Score Celebration Banner in Game Over */
+.new-record-banner {
+  background: linear-gradient(135deg, rgba(255, 204, 51, 0.2), rgba(255, 51, 102, 0.25));
+  border: 2px solid #ffcc33;
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-weight: 800;
+  color: #ffcc33;
+  font-size: 1rem;
+  letter-spacing: 1px;
+  box-shadow: 0 0 20px rgba(255, 204, 51, 0.3);
+  animation: pulse-glow 1.5s infinite alternate;
+}
+
+@keyframes pulse-glow {
+  0% { transform: scale(0.98); box-shadow: 0 0 10px rgba(255, 204, 51, 0.3); }
+  100% { transform: scale(1.02); box-shadow: 0 0 25px rgba(255, 204, 51, 0.6); }
 }
 
 /* Mode Switch & Action Buttons */

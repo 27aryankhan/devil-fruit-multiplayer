@@ -323,6 +323,33 @@ class GameAudio {
     }, 400);
   }
 
+  playHighscoreFanfare() {
+    if (this.muted || !this.ctx) return;
+    this.resumeContext();
+    const now = this.ctx.currentTime;
+    
+    // Triumphant victory fanfare: C5 -> E5 -> G5 -> C6
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    notes.forEach((freq, i) => {
+      const startTime = now + i * 0.12;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, startTime);
+      
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(0.25, startTime + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + (i === notes.length - 1 ? 1.2 : 0.4));
+      
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      
+      osc.start(startTime);
+      osc.stop(startTime + (i === notes.length - 1 ? 1.3 : 0.45));
+    });
+  }
+
   stopMusic() {
     this.musicPlaying = false;
     if (this.musicInterval) {
