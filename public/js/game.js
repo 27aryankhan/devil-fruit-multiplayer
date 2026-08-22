@@ -117,7 +117,15 @@ function renderLeaderboard(items, stats) {
   list.innerHTML = '';
 
   if (!items || items.length === 0) {
-    list.innerHTML = '<div class="lb-empty">No records yet. Be the first!</div>';
+    list.innerHTML = `
+      <div class="lb-empty" style="padding: 36px 16px; text-align: center;">
+        <span style="font-size: 2rem; display: block; margin-bottom: 8px;">⚔️</span>
+        <strong style="color: #cbd5e1; font-size: 0.95rem; display: block; margin-bottom: 4px;">Hall of Slayers is Open</strong>
+        <p style="color: #64748b; font-size: 0.8rem; margin: 0; line-height: 1.4;">
+          Connect your phone & slice fruits to become the #1 Champion!
+        </p>
+      </div>
+    `;
     return;
   }
 
