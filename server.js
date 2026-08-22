@@ -275,6 +275,7 @@ const server = http.createServer((req, res) => {
     const forwardedHost = req.headers['x-forwarded-host'];
     const hostHeader = req.headers.host;
     const proto = req.headers['x-forwarded-proto'] || (req.socket.encrypted ? 'https' : 'http');
+    const isRenderCloud = process.env.RENDER === 'true' || !!process.env.RENDER_SERVICE_ID || !!process.env.RENDER_INSTANCE_ID || req.headers['x-forwarded-proto'] === 'https';
 
     let currentLocalUrl, currentControllerUrl, currentIp;
 
@@ -290,6 +291,11 @@ const server = http.createServer((req, res) => {
       currentLocalUrl = `${proto}://${hostHeader}`;
       currentControllerUrl = `${proto}://${hostHeader}/controller.html`;
       currentIp = hostHeader.split(':')[0];
+    } else if (isRenderCloud) {
+      const publicDomain = 'devil-fruit-multiplayer.onrender.com';
+      currentLocalUrl = `https://${publicDomain}`;
+      currentControllerUrl = `https://${publicDomain}/controller.html`;
+      currentIp = publicDomain;
     } else {
       currentIp = getLocalIp();
       currentLocalUrl = `http://${currentIp}:${PORT}`;
