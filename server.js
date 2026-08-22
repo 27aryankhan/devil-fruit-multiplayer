@@ -114,6 +114,21 @@ function setSecurityHeaders(res) {
   });
 }
 
+// Helper to identify private LAN/Docker IPs vs public domains
+function isPrivateHost(host) {
+  if (!host) return true;
+  const hostname = host.split(':')[0];
+  if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+  
+  const parts = hostname.split('.').map(Number);
+  if (parts.length === 4 && !parts.some(isNaN)) {
+    if (parts[0] === 10) return true; // 10.0.0.0/8
+    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true; // 172.16.0.0/12
+    if (parts[0] === 192 && parts[1] === 168) return true; // 192.168.0.0/16
+  }
+  return false;
+}
+
 // Server request handler
 const server = http.createServer((req, res) => {
   // Apply security headers to every response
@@ -123,15 +138,18 @@ const server = http.createServer((req, res) => {
   
   // API endpoint for screen/controller info
   if (filePath.startsWith('/api/connection-info')) {
-    const host = req.headers.host;
+    const renderHost = process.env.RENDER_EXTERNAL_HOSTNAME;
+    const forwardedHost = req.headers['x-forwarded-host'];
+    const rawHost = renderHost || forwardedHost || req.headers.host;
+    const isCloud = renderHost || (rawHost && !isPrivateHost(rawHost));
     const proto = req.headers['x-forwarded-proto'] || (req.socket.encrypted ? 'https' : 'http');
-    const isCloudHost = host && !host.includes('localhost') && !host.includes('127.0.0.1');
 
     let currentLocalUrl, currentControllerUrl, currentIp;
-    if (isCloudHost) {
-      currentIp = host;
-      currentLocalUrl = `${proto}://${host}`;
-      currentControllerUrl = `${proto}://${host}/controller.html`;
+    if (isCloud) {
+      const publicHost = renderHost || forwardedHost || rawHost;
+      currentIp = publicHost.split(':')[0];
+      currentLocalUrl = `${proto}://${publicHost}`;
+      currentControllerUrl = `${proto}://${publicHost}/controller.html`;
     } else {
       currentIp = getLocalIp();
       currentLocalUrl = `http://${currentIp}:${PORT}`;
