@@ -270,18 +270,26 @@ const server = http.createServer((req, res) => {
   
   // API endpoint for screen/controller info
   if (filePath.startsWith('/api/connection-info')) {
+    const renderUrl = process.env.RENDER_EXTERNAL_URL;
     const renderHost = process.env.RENDER_EXTERNAL_HOSTNAME;
     const forwardedHost = req.headers['x-forwarded-host'];
-    const rawHost = renderHost || forwardedHost || req.headers.host;
-    const isCloud = renderHost || (rawHost && !isPrivateHost(rawHost));
+    const hostHeader = req.headers.host;
     const proto = req.headers['x-forwarded-proto'] || (req.socket.encrypted ? 'https' : 'http');
 
     let currentLocalUrl, currentControllerUrl, currentIp;
-    if (isCloud) {
-      const publicHost = renderHost || forwardedHost || rawHost;
-      currentIp = publicHost.split(':')[0];
-      currentLocalUrl = `${proto}://${publicHost}`;
-      currentControllerUrl = `${proto}://${publicHost}/controller.html`;
+
+    if (renderUrl) {
+      currentLocalUrl = renderUrl.replace(/\/$/, '');
+      currentControllerUrl = `${currentLocalUrl}/controller.html`;
+      currentIp = renderHost || 'cloud';
+    } else if (forwardedHost) {
+      currentLocalUrl = `${proto}://${forwardedHost}`;
+      currentControllerUrl = `${proto}://${forwardedHost}/controller.html`;
+      currentIp = forwardedHost.split(':')[0];
+    } else if (hostHeader && !hostHeader.includes('localhost') && !hostHeader.includes('127.0.0.1') && !isPrivateHost(hostHeader)) {
+      currentLocalUrl = `${proto}://${hostHeader}`;
+      currentControllerUrl = `${proto}://${hostHeader}/controller.html`;
+      currentIp = hostHeader.split(':')[0];
     } else {
       currentIp = getLocalIp();
       currentLocalUrl = `http://${currentIp}:${PORT}`;
