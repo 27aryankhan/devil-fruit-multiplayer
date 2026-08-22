@@ -374,7 +374,7 @@ const server = http.createServer((req, res) => {
           return;
         }
 
-        const country = getClientCountry(req);
+        const country = payload.country || getClientCountry(req);
         const newEntry = {
           id: Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
           name,
@@ -597,6 +597,7 @@ wss.on('connection', (ws, req) => {
                   }
                 }
                 
+                slot.country = data.country || getClientCountry(req);
                 controllers.set(ws, slot);
               } else {
                 // No slots available
@@ -609,14 +610,15 @@ wss.on('connection', (ws, req) => {
               }
             }
 
-            console.log(`Controller registered as Player ${slot.id} (${slot.color}) with name ${slot.name}`);
+            console.log(`Controller registered as Player ${slot.id} (${slot.color}) with name ${slot.name} [${slot.country}]`);
             
             // Confirm registration to controller
             ws.send(JSON.stringify({
               type: 'registered',
               playerId: slot.id,
               color: slot.color,
-              name: slot.name
+              name: slot.name,
+              country: slot.country
             }));
 
             // Notify the screen
@@ -625,7 +627,8 @@ wss.on('connection', (ws, req) => {
                 type: 'playerJoined',
                 playerId: slot.id,
                 color: slot.color,
-                name: slot.name
+                name: slot.name,
+                country: slot.country
               }));
             }
           }

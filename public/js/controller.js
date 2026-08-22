@@ -48,75 +48,45 @@ const hudMode = document.getElementById('hud-mode');
 const badgeDot = document.getElementById('badge-dot');
 const playerNameDisplay = document.getElementById('player-name');
 
-// --- CONNECT TO WEBSOCKETS ---
+// --- AUTO-DETECT COUNTRY ---
+function detectUserCountry() {
+  try {
+    const lang = navigator.language || (navigator.languages && navigator.languages[0]) || '';
+    if (lang.includes('-')) {
+      const region = lang.split('-')[1].toUpperCase();
+      if (region.length === 2 && region !== 'UN') return region;
+    }
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    if (tz.includes('Kolkata') || tz.includes('Calcutta') || tz.includes('India')) return 'IN';
+    if (tz.includes('New_York') || tz.includes('Chicago') || tz.includes('Los_Angeles') || tz.includes('Denver')) return 'US';
+    if (tz.includes('Tokyo')) return 'JP';
+    if (tz.includes('London')) return 'GB';
+    if (tz.includes('Berlin')) return 'DE';
+    if (tz.includes('Paris')) return 'FR';
+    if (tz.includes('Dubai')) return 'AE';
+    if (tz.includes('Singapore')) return 'SG';
+    if (tz.includes('Seoul')) return 'KR';
+    if (tz.includes('Toronto') || tz.includes('Vancouver')) return 'CA';
+    if (tz.includes('Sydney') || tz.includes('Melbourne')) return 'AU';
+  } catch (e) {}
+  return 'IN';
+}
 
 window.addEventListener('DOMContentLoaded', () => {
   connectWebSocket();
   setupTouchpad();
+  
+  // Pre-select detected country
+  const detected = detectUserCountry();
+  const selectEl = document.getElementById('country-select');
+  if (selectEl) {
+    selectEl.value = detected;
+  }
+
   if (joinBtn) {
     joinBtn.addEventListener('click', requestJoin);
   }
 });
-
-function connectWebSocket() {
-  // Automatically connect to the same IP/Host serving this file
-  const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${wsProto}//${window.location.host}`;
-  
-  socket = new WebSocket(wsUrl);
-
-  socket.onopen = () => {
-    console.log('Connected to Dojo WebSocket Server');
-    statusText.innerText = 'Connected! Dojo Dojo!';
-  };
-
-  socket.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      
-      switch (data.type) {
-        case 'slotOffer':
-          handleSlotOffer(data);
-          break;
-          
-        case 'lobbyFull':
-          handleLobbyFull(data);
-          break;
-
-        case 'registered':
-          handleRegistration(data);
-          break;
-          
-        case 'gameSync':
-          handleGameSync(data);
-          break;
-          
-        case 'vibrate':
-          // Perform physical phone vibration
-          if (navigator.vibrate) {
-            navigator.vibrate(data.pattern);
-          }
-          break;
-          
-        case 'error':
-          statusText.innerText = data.message;
-          joinBtn.disabled = true;
-          break;
-      }
-    } catch (e) {
-      console.error('Error handling server message:', e);
-    }
-  };
-
-  socket.onclose = () => {
-    console.warn('Socket closed. Reconnecting...');
-    statusText.innerText = 'Lost connection to Dojo. Reconnecting...';
-    joinBtn.disabled = true;
-    setTimeout(connectWebSocket, 1500);
-  };
-}
-
-// --- JOIN REQUEST & FULLSCREEN ---
 
 function handleSlotOffer(data) {
   offeredPlayerId = data.playerId;
@@ -154,12 +124,16 @@ function requestJoin() {
     chosenName = defaultPlayerName || 'Ninja';
   }
 
+  const countrySelect = document.getElementById('country-select');
+  const chosenCountry = countrySelect ? countrySelect.value : detectUserCountry();
+
   // Register with the server
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({
       type: 'register',
       role: 'controller',
-      playerName: chosenName
+      playerName: chosenName,
+      country: chosenCountry
     }));
     statusText.innerText = 'Forging sword...';
   }

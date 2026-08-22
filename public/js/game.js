@@ -337,7 +337,7 @@ function initWebSocket(hostIp) {
       
       switch (data.type) {
         case 'playerJoined':
-          registerPlayer(data.playerId, data.color, data.name);
+          registerPlayer(data.playerId, data.color, data.name, data.country);
           break;
         case 'playerLeft':
           unregisterPlayer(data.playerId);
@@ -418,11 +418,20 @@ setInterval(() => {
 
 // --- MULTIPLAYER LOBBY HUB ---
 
-function registerPlayer(id, color, name) {
+function countryCodeToFlagEmoji(cc) {
+  if (!cc || typeof cc !== 'string' || cc.length !== 2 || cc === 'GLOBAL' || cc === 'XX') return '🌐';
+  const upper = cc.toUpperCase();
+  const codePoints = [...upper].map(c => 127397 + c.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+}
+
+function registerPlayer(id, color, name, country) {
+  const pCountry = country || 'IN';
   players[id] = {
     id,
     color,
     name,
+    country: pCountry,
     score: 0,
     activeCombo: [],
     comboTimer: null
@@ -431,13 +440,14 @@ function registerPlayer(id, color, name) {
   playerScores[id] = 0;
   swipeTrails[id] = [];
   
-  // Update Lobby Slot UI
+  // Update Lobby Slot UI with Country Flag
   const slot = document.querySelector(`.player-slot[data-slot="${id}"]`);
   if (slot) {
     slot.classList.remove('empty');
     slot.classList.add('active');
     slot.style.color = color;
-    slot.querySelector('.slot-text').innerText = name;
+    const flag = countryCodeToFlagEmoji(pCountry);
+    slot.querySelector('.slot-text').innerText = `${flag} ${name}`;
   }
 
   // Count active players
@@ -917,7 +927,8 @@ function endGame() {
             combo: maxCombosAchieved[p.id] || 0,
             mode: gameMode,
             duration: matchDuration,
-            fruitsSliced: matchFruitsSliced
+            fruitsSliced: matchFruitsSliced,
+            country: p.country || 'IN'
           })
         })
         .then(res => res.json())
