@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Dojo Blade - Controller</title>
+  <link rel="stylesheet" href="css/controller.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body>
+  <!-- Fullscreen Touch Active Pad -->
+  <div id="touch-pad"></div>
+
+  <!-- Setup Fullscreen Overlay -->
+  <div id="overlay-setup" class="fullscreen-overlay">
+    <div class="overlay-card">
+      <h1 class="title">DOJO BLADE</h1>
+      <p class="subtitle">Real-time Sword Controller</p>
+      
+      <div class="status-msg" id="status-text">Connecting to Dojo Server...</div>
+      
+      <!-- Name Entry Field -->
+      <div class="name-entry-container" style="display: flex; flex-direction: column; gap: 8px; text-align: left; width: 100%;">
+        <label for="name-input" style="font-size: 0.8rem; color: #8a94a6; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; padding-left: 4px;">Enter your name</label>
+        <input type="text" id="name-input" placeholder="Connecting..." maxlength="12" 
+               style="width: 100%; padding: 16px 20px; border: 2px solid rgba(255, 255, 255, 0.15); border-radius: 16px; background: rgba(255, 255, 255, 0.05); color: #fff; font-family: 'Outfit', sans-serif; font-size: 1.1rem; text-align: center; box-sizing: border-box; outline: none; transition: all 0.3s;" />
+      </div>
+      
+      <style>
+        #name-input:focus {
+          border-color: #ff3366 !important;
+          box-shadow: 0 0 15px rgba(255, 51, 102, 0.4);
+          background: rgba(255, 255, 255, 0.08) !important;
+        }
+      </style>
+      
+      <button class="action-btn" id="btn-join" disabled>
+        Sync Sword (Enter Dojo)
+      </button>
+    </div>
+  </div>
+
+  <!-- Connected Controller HUD Overlay -->
+  <div id="hud-container" class="hidden">
+    <div class="hud-top">
+      <div class="player-badge" id="player-badge">
+        <span class="badge-dot" id="badge-dot"></span>
+        <span id="player-name">Player X</span>
+      </div>
+      <div class="mode-tag" id="hud-mode">Classic</div>
+    </div>
+
+    <!-- Centered Score / Timer -->
+    <div class="hud-center">
+      <div class="score-display">
+        <span class="label">SCORE</span>
+        <span class="value" id="hud-score">0</span>
+      </div>
+      <div class="timer-display hidden" id="hud-timer">90s</div>
+    </div>
+
+    <div class="hud-bottom">
+      <!-- Lives Display (Classic) -->
+      <div class="lives-display" id="hud-lives">
+        <span class="heart-icon" id="heart-1">❤️</span>
+        <span class="heart-icon" id="heart-2">❤️</span>
+        <span class="heart-icon" id="heart-3">❤️</span>
+      </div>
+      
+      <!-- Controller Status text -->
+      <div class="swipe-hint">Swipe on screen to slash!</div>
+    </div>
+  </div>
+
+  <!-- Game Over mobile overlay -->
+  <div id="game-over-overlay" class="fullscreen-overlay hidden">
+    <div class="overlay-card">
+      <h2 class="title" style="color: #ff3366;">MATCH ENDED</h2>
+      <p class="subtitle">Check the main screen for rankings</p>
+      
+      <div class="final-score">
+        <span>Your Score:</span>
+        <span id="final-score-val" class="final-val">0</span>
+      </div>
+
+      <button class="action-btn" onclick="vibrateTap(); location.reload();">
+        Slash to Reconnect
+      </button>
+    </div>
+  </div>
+
+  <!-- Load script -->
+  <script src="js/controller.js"></script>
+</body>
+</html>

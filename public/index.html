@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Devil Fruits - Multi-Device Experience</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Ambient background canvas -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Interactive Lobby -->
+  <div id="lobby">
+    <div class="lobby-card">
+      <h1 class="game-title">DEVIL FRUITS</h1>
+      <p class="subtitle">Multiplayer Real-time Experience</p>
+
+      <div class="connection-container">
+        <div class="qr-box">
+          <canvas id="qr-canvas"></canvas>
+          <div class="qr-loader" id="qr-loader">Generating Connection Link...</div>
+        </div>
+
+        <div class="instructions">
+          <div id="online-instructions">
+            <h3>How to Connect:</h3>
+            <ol>
+              <li>Connect your mobile phone to the <strong>same Wi-Fi network</strong> as this laptop.</li>
+              <li>Scan the QR code or enter this URL in your mobile browser:
+                <div class="connection-url" id="connection-url">http://loading...</div>
+              </li>
+            </ol>
+          </div>
+          <div id="offline-instructions" style="display: none; padding: 15px; border-radius: 12px; background: rgba(255, 51, 102, 0.1); border: 1px solid rgba(255, 51, 102, 0.3);">
+            <h3 style="color: #ff3366; margin-top: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">⚠️ Dojo Server is Offline</h3>
+            <p style="font-size: 0.85rem; line-height: 1.4; color: #cbd5e1; margin: 0 0 10px 0;">
+              To play, the background Dojo Server must be running on your laptop.
+            </p>
+            <h4 style="margin: 0 0 6px 0; color: #fff; font-size: 0.85rem;">How to Start the Server:</h4>
+            <ul style="font-size: 0.8rem; padding-left: 20px; margin: 0; color: #94a3b8; line-height: 1.4;">
+              <li>Double-click the <strong style="color: #ff3366;">Start Dojo Blade.command</strong> file in the game folder.</li>
+              <li>If you get a permission error, open Terminal, drag the file into it, and run:<br><code style="background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px; font-family: monospace; display: inline-block; margin-top: 4px; color: #fff;">chmod +x "Start Dojo Blade.command"</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- WS Connection Status -->
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:0.78rem;">
+        <span id="ws-status-dot" style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#ff3366; box-shadow:0 0 8px #ff3366; flex-shrink:0;"></span>
+        <span id="ws-status-label" style="color:#8a94a6;">Connecting to server...</span>
+      </div>
+
+      <!-- Connected Players Lobby -->
+      <div class="players-section">
+        <h3>Connected Slayers: <span id="player-count">0</span>/4</h3>
+        <div class="players-list" id="players-list">
+          <div class="player-slot empty" data-slot="1">
+            <span class="slot-dot" style="background-color: #ff3366;"></span>
+            <span class="slot-text">Player 1 (Waiting...)</span>
+          </div>
+          <div class="player-slot empty" data-slot="2">
+            <span class="slot-dot" style="background-color: #33ff66;"></span>
+            <span class="slot-text">Player 2 (Waiting...)</span>
+          </div>
+          <div class="player-slot empty" data-slot="3">
+            <span class="slot-dot" style="background-color: #3399ff;"></span>
+            <span class="slot-text">Player 3 (Waiting...)</span>
+          </div>
+          <div class="player-slot empty" data-slot="4">
+            <span class="slot-dot" style="background-color: #ffcc33;"></span>
+            <span class="slot-text">Player 4 (Waiting...)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Game Options & Start -->
+      <div class="controls-section">
+        <div class="mode-select">
+          <button class="mode-btn active" id="btn-classic" onclick="setMode('classic')">
+            <strong>Classic Mode</strong>
+            <span>3 Lives • Bombs • High Stakes</span>
+          </button>
+          <button class="mode-btn" id="btn-zen" onclick="setMode('zen')">
+            <strong>Zen Mode</strong>
+            <span>90 Seconds • No Bombs • Relaxed Slicing</span>
+          </button>
+        </div>
+
+        <div class="action-row">
+          <button class="action-btn unmute-btn" id="btn-audio" onclick="toggleAudio()">
+            <span class="audio-icon">🔇</span> Enable Sounds
+          </button>
+          <button class="action-btn" id="btn-sync" onclick="resyncScreen()" style="background:rgba(51,153,255,0.15); border:1px solid rgba(51,153,255,0.4); color:#3399ff;">
+            ↻ Sync Players
+          </button>
+          <button class="action-btn start-btn" id="btn-start" onclick="startGame()" disabled>
+            Enter the Dojo (Connect Phone)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game HUD (shown during gameplay overlay) -->
+  <div id="hud" class="hidden">
+    <!-- Player Scores -->
+    <div class="scores-panel" id="scores-panel">
+      <!-- Player score items will be inserted dynamically -->
+    </div>
+
+    <!-- Mode Indicator & Timer (Zen) -->
+    <div class="game-info-panel">
+      <div class="game-mode-tag" id="hud-mode">CLASSIC</div>
+      <div class="timer-display hidden" id="hud-timer">90s</div>
+    </div>
+
+    <!-- Lives Panel (Classic) -->
+    <div class="lives-panel" id="lives-panel">
+      <span class="life-cross" id="life-1">❌</span>
+      <span class="life-cross" id="life-2">❌</span>
+      <span class="life-cross" id="life-3">❌</span>
+    </div>
+  </div>
+
+  <!-- Game Over Screen -->
+  <div id="game-over" class="hidden">
+    <div class="game-over-card">
+      <h2 class="game-over-title animate-pulse">GAME OVER</h2>
+      <p class="final-mode-subtitle" id="final-mode-subtitle">Classic Mode</p>
+      
+      <div class="results-table" id="results-table">
+        <!-- Results per player -->
+      </div>
+
+      <div class="game-over-buttons">
+        <button class="action-btn start-btn" onclick="returnToLobby()">Return to Lobby</button>
+        <button class="action-btn replay-btn" onclick="restartGame()">Play Again</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Load Scripts -->
+  <script src="js/qrious.min.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
