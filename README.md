@@ -7,12 +7,16 @@
 [![Node.js](https://img.shields.io/badge/Node.js-v18+-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![WebSocket](https://img.shields.io/badge/WebSocket-Realtime%2060FPS-010101?style=for-the-badge&logo=socketdotio&logoColor=white)](https://github.com/websockets/ws)
 [![Canvas 2D](https://img.shields.io/badge/HTML5-Canvas%202D-E34F26?style=for-the-badge&logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API)
-[![Web Audio API](https://img.shields.io/badge/Web_Audio-Procedural_Synth-8A2BE2?style=for-the-badge)](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Online%20on%20Render-46E3B7?style=for-the-badge&logo=render&logoColor=white)](https://devil-fruit-multiplayer.onrender.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
 <p align="center">
   <b>Transform your smartphone into a wireless katana.</b><br>
   Scan the QR code from any browser, slash across your phone screen, and slice fruits in real-time on your laptop display with multi-device haptic feedback!
+</p>
+
+<p align="center">
+  🎮 <b>Live Game:</b> <a href="https://devil-fruit-multiplayer.onrender.com">https://devil-fruit-multiplayer.onrender.com</a>
 </p>
 
 </div>
@@ -123,9 +127,15 @@ npm start
 
 ## Deployment
 
-This project is ready to deploy with persistent WebSockets on any cloud platform:
+### 🌐 Live Deployment
+The game is currently deployed and running live:
+- **Main Arena Display**: [https://devil-fruit-multiplayer.onrender.com](https://devil-fruit-multiplayer.onrender.com)
+- **Mobile Controller**: [https://devil-fruit-multiplayer.onrender.com/controller.html](https://devil-fruit-multiplayer.onrender.com/controller.html)
 
-- **[Render.com](https://render.com)**: Create a **Web Service**, connect your GitHub repo, set Build Command to `npm install` and Start Command to `npm start`.
+### 🚀 Deploy Your Own
+This project is pre-configured with WebSocket support for easy cloud deployment:
+
+- **[Render.com](https://render.com)**: Create a **Web Service**, connect your GitHub repo, set Build Command to `npm install` and Start Command to `npm start`. Set environment variable `PORT` if needed (defaults to standard web ports).
 
 ---
 
