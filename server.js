@@ -268,6 +268,16 @@ const server = http.createServer((req, res) => {
 
   let filePath = req.url === '/' ? '/index.html' : req.url;
   
+  // Health check / ping endpoint for keep-alive monitoring (e.g. UptimeRobot / cron-job.org)
+  if (filePath === '/health' || filePath === '/ping') {
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    });
+    res.end(JSON.stringify({ status: 'ok', uptime: process.uptime() }));
+    return;
+  }
+  
   // API endpoint for screen/controller info
   if (filePath.startsWith('/api/connection-info')) {
     const renderUrl = process.env.RENDER_EXTERNAL_URL;
