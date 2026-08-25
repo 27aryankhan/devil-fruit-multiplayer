@@ -304,7 +304,6 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   tryConnect();
-  setupDesktopInput();
   fetchLeaderboard('classic');
 
   // Start Animation Loop
@@ -1869,92 +1868,4 @@ function startLobbyAnimations() {
       });
     }
   }, 2500);
-}
-
-// --- DESKTOP MOUSE & TOUCH SLICING SUPPORT ---
-let desktopIsSlashing = false;
-let desktopLastPoint = null;
-
-function setupDesktopInput() {
-  const handleDown = (clientX, clientY) => {
-    audio.resumeContext();
-    
-    // Auto-register local player 1 if no players in lobby
-    const pId = Object.keys(players)[0] || 1;
-    if (!players[pId]) {
-      registerPlayer(pId, PLAYER_COLORS[1], 'Blade Master');
-    }
-
-    desktopIsSlashing = true;
-    const pt = { x: clientX, y: clientY, age: 0 };
-    desktopLastPoint = pt;
-
-    if (!swipeTrails[pId]) swipeTrails[pId] = [];
-    swipeTrails[pId].push(pt);
-    activePointers[pId] = { x: clientX, y: clientY, color: (players[pId] && players[pId].color) || PLAYER_COLORS[1] };
-
-    if (gameState === 'PLAYING') {
-      checkProximityCollisions(pId, clientX, clientY);
-    }
-    audio.playSwish();
-  };
-
-  const handleMove = (clientX, clientY) => {
-    if (!desktopIsSlashing) return;
-    const pId = Object.keys(players)[0] || 1;
-    const pt = { x: clientX, y: clientY, age: 0 };
-
-    if (!swipeTrails[pId]) swipeTrails[pId] = [];
-    swipeTrails[pId].push(pt);
-    if (swipeTrails[pId].length > 14) swipeTrails[pId].shift();
-
-    activePointers[pId] = { x: clientX, y: clientY, color: (players[pId] && players[pId].color) || PLAYER_COLORS[1] };
-
-    if (desktopLastPoint && gameState === 'PLAYING') {
-      checkCollisions(pId, desktopLastPoint, pt);
-    }
-    desktopLastPoint = pt;
-
-    if (Math.random() < 0.14) {
-      audio.playSwish();
-    }
-  };
-
-  const handleUp = () => {
-    if (!desktopIsSlashing) return;
-    const pId = Object.keys(players)[0] || 1;
-    desktopIsSlashing = false;
-    desktopLastPoint = null;
-    delete activePointers[pId];
-    checkCombo(pId);
-  };
-
-  window.addEventListener('mousedown', (e) => {
-    // Only slice if not clicking on UI buttons
-    if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
-      handleDown(e.clientX, e.clientY);
-    }
-  });
-
-  window.addEventListener('mousemove', (e) => {
-    handleMove(e.clientX, e.clientY);
-  });
-
-  window.addEventListener('mouseup', handleUp);
-
-  window.addEventListener('touchstart', (e) => {
-    if (e.touches.length > 0 && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
-      const t = e.touches[0];
-      handleDown(t.clientX, t.clientY);
-    }
-  }, { passive: true });
-
-  window.addEventListener('touchmove', (e) => {
-    if (e.touches.length > 0 && desktopIsSlashing) {
-      const t = e.touches[0];
-      handleMove(t.clientX, t.clientY);
-    }
-  }, { passive: true });
-
-  window.addEventListener('touchend', handleUp);
 }
