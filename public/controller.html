@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="css/controller.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
@@ -15,58 +15,60 @@
   <!-- Fullscreen Touch Active Pad -->
   <div id="touch-pad"></div>
 
-  <!-- Setup Fullscreen Overlay -->
+  <!-- Setup Fullscreen Overlay (Enter Screen) -->
   <div id="overlay-setup" class="fullscreen-overlay">
     <div class="overlay-card">
-      <h1 class="title">DOJO BLADE</h1>
-      <p class="subtitle">Real-time Sword Controller</p>
-      
-      <div class="status-msg" id="status-text">Connecting to Dojo Server...</div>
-      
-      <!-- Name Entry Field -->
-      <div class="name-entry-container" style="display: flex; flex-direction: column; gap: 8px; text-align: left; width: 100%;">
-        <label for="name-input" style="font-size: 0.8rem; color: #8a94a6; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; padding-left: 4px;">Slayer Name</label>
-        <input type="text" id="name-input" placeholder="Connecting..." maxlength="12" 
-               style="width: 100%; padding: 14px 18px; border: 2px solid rgba(255, 255, 255, 0.15); border-radius: 14px; background: rgba(255, 255, 255, 0.05); color: #fff; font-family: 'Outfit', sans-serif; font-size: 1.05rem; text-align: center; box-sizing: border-box; outline: none; transition: all 0.3s;" />
+      <div class="logo-wrap">
+        <h1 class="title">DOJO BLADE</h1>
+        <p class="subtitle">Real-time Sword Controller</p>
       </div>
+      
+      <!-- Connection Status Badge -->
+      <div class="status-msg" id="status-text">
+        <span class="status-indicator-dot" id="status-dot"></span>
+        <span id="status-label">Connecting to Dojo Server...</span>
+      </div>
+      
+      <!-- Form for Name & Flag -->
+      <form id="setup-form" onsubmit="event.preventDefault(); requestJoin();" style="display: flex; flex-direction: column; gap: 14px; width: 100%;">
+        <!-- Name Entry Field -->
+        <div class="name-entry-container" style="display: flex; flex-direction: column; gap: 6px; text-align: left; width: 100%;">
+          <label for="name-input" class="field-label">Slayer Name</label>
+          <input type="text" id="name-input" placeholder="Connecting..." maxlength="14" 
+                 autocomplete="nickname" autocapitalize="words" enterkeyhint="go"
+                 class="form-input" />
+        </div>
 
-      <!-- Nationality / Flag Selector -->
-      <div class="country-entry-container" style="display: flex; flex-direction: column; gap: 8px; text-align: left; width: 100%; margin-top: 4px;">
-        <label for="country-select" style="font-size: 0.8rem; color: #8a94a6; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; padding-left: 4px;">Nationality Flag</label>
-        <select id="country-select" 
-                style="width: 100%; padding: 12px 16px; border: 2px solid rgba(255, 255, 255, 0.15); border-radius: 14px; background: #171b22; color: #fff; font-family: 'Outfit', sans-serif; font-size: 0.95rem; box-sizing: border-box; outline: none; cursor: pointer;">
-          <option value="IN">🇮🇳 India</option>
-          <option value="US">🇺🇸 United States</option>
-          <option value="GB">🇬🇧 United Kingdom</option>
-          <option value="JP">🇯🇵 Japan</option>
-          <option value="CA">🇨🇦 Canada</option>
-          <option value="AU">🇦🇺 Australia</option>
-          <option value="DE">🇩🇪 Germany</option>
-          <option value="FR">🇫🇷 France</option>
-          <option value="BR">🇧🇷 Brazil</option>
-          <option value="AE">🇦🇪 United Arab Emirates</option>
-          <option value="SA">🇸🇦 Saudi Arabia</option>
-          <option value="SG">🇸🇬 Singapore</option>
-          <option value="KR">🇰🇷 South Korea</option>
-          <option value="IT">🇮🇹 Italy</option>
-          <option value="ES">🇪🇸 Spain</option>
-          <option value="MX">🇲🇽 Mexico</option>
-          <option value="RU">🇷🇺 Russia</option>
-          <option value="ZA">🇿🇦 South Africa</option>
-        </select>
-      </div>
-      
-      <style>
-        #name-input:focus, #country-select:focus {
-          border-color: #ff3366 !important;
-          box-shadow: 0 0 15px rgba(255, 51, 102, 0.4);
-          background: rgba(255, 255, 255, 0.08) !important;
-        }
-      </style>
-      
-      <button class="action-btn" id="btn-join" disabled style="margin-top: 10px;">
-        Sync Sword (Enter Dojo)
-      </button>
+        <!-- Nationality / Flag Selector -->
+        <div class="country-entry-container" style="display: flex; flex-direction: column; gap: 6px; text-align: left; width: 100%;">
+          <label for="country-select" class="field-label">Nationality Flag</label>
+          <select id="country-select" class="form-select">
+            <option value="IN">🇮🇳 India</option>
+            <option value="US">🇺🇸 United States</option>
+            <option value="GB">🇬🇧 United Kingdom</option>
+            <option value="JP">🇯🇵 Japan</option>
+            <option value="CA">🇨🇦 Canada</option>
+            <option value="AU">🇦🇺 Australia</option>
+            <option value="DE">🇩🇪 Germany</option>
+            <option value="FR">🇫🇷 France</option>
+            <option value="BR">🇧🇷 Brazil</option>
+            <option value="AE">🇦🇪 United Arab Emirates</option>
+            <option value="SA">🇸🇦 Saudi Arabia</option>
+            <option value="SG">🇸🇬 Singapore</option>
+            <option value="KR">🇰🇷 South Korea</option>
+            <option value="IT">🇮🇹 Italy</option>
+            <option value="ES">🇪🇸 Spain</option>
+            <option value="MX">🇲🇽 Mexico</option>
+            <option value="RU">🇷🇺 Russia</option>
+            <option value="ZA">🇿🇦 South Africa</option>
+          </select>
+        </div>
+        
+        <!-- Enter Button -->
+        <button type="submit" class="action-btn enter-btn" id="btn-join" disabled>
+          ⚔️ ENTER GAME
+        </button>
+      </form>
     </div>
   </div>
 
@@ -76,17 +78,31 @@
       <div class="player-badge" id="player-badge">
         <span class="badge-dot" id="badge-dot"></span>
         <span id="player-name">Player X</span>
+        <span id="player-flag" style="font-size: 1rem; margin-left: 2px;"></span>
       </div>
       <div class="mode-tag" id="hud-mode">Classic</div>
     </div>
 
-    <!-- Centered Score / Timer -->
+    <!-- Center Section: Lobby Waiting & Start Button OR Active Game Score -->
     <div class="hud-center">
-      <div class="score-display">
-        <span class="label">SCORE</span>
-        <span class="value" id="hud-score">0</span>
+      <!-- Waiting in Lobby Card (shown if game hasn't started yet) -->
+      <div id="lobby-waiting-card" class="lobby-waiting-card">
+        <div class="lobby-waiting-badge">🛡️ SWORD READY</div>
+        <h2 style="font-size: 1.3rem; font-weight: 800; color: #fff; margin: 4px 0 2px 0;">You're in the Dojo!</h2>
+        <p style="font-size: 0.8rem; color: #94a3b8; margin: 0 0 14px 0;">Tap Start to begin match, or wait for host.</p>
+        <button type="button" class="action-btn start-match-btn" id="btn-start-game" onclick="requestStartGame()">
+          ⚔️ START GAME NOW
+        </button>
       </div>
-      <div class="timer-display hidden" id="hud-timer">90s</div>
+
+      <!-- Live Gameplay Score & Timer -->
+      <div id="live-gameplay-card" class="live-gameplay-card hidden">
+        <div class="score-display">
+          <span class="label">SCORE</span>
+          <span class="value" id="hud-score">0</span>
+        </div>
+        <div class="timer-display hidden" id="hud-timer">90s</div>
+      </div>
     </div>
 
     <div class="hud-bottom">
@@ -98,7 +114,7 @@
       </div>
       
       <!-- Controller Status text -->
-      <div class="swipe-hint">Swipe on screen to slash!</div>
+      <div class="swipe-hint" id="swipe-hint">🗡️ Swipe anywhere on screen to slash!</div>
     </div>
   </div>
 
@@ -113,8 +129,8 @@
         <span id="final-score-val" class="final-val">0</span>
       </div>
 
-      <button class="action-btn" onclick="vibrateTap(); location.reload();">
-        Slash to Reconnect
+      <button class="action-btn restart-btn" id="btn-play-again" onclick="requestPlayAgain()">
+        ⚔️ Play Again
       </button>
     </div>
   </div>

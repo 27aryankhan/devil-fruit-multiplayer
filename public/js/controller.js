@@ -20,26 +20,41 @@ function triggerSecurityLockdown(reason) {
   `;
 }
 
-let socket;
+// Controller State Variables
+let socket = null;
+let reconnectTimer = null;
 let playerId = null;
 let playerColor = '#ffffff';
 let playerName = '';
+let playerCountry = 'IN';
 let isRegistered = false;
 let offeredPlayerId = null;
 let defaultPlayerName = '';
+let currentGameState = 'LOBBY';
 
 // Touch state variables
 let isTouching = false;
 let lastX = 0;
 let lastY = 0;
 let lastTime = 0;
+let lastSocketSentTime = 0;
+const THROTTLE_MS = 12; // ~83 updates/sec
 
+// DOM Elements
 const touchPad = document.getElementById('touch-pad');
 const statusText = document.getElementById('status-text');
+const statusDot = document.getElementById('status-dot');
+const statusLabel = document.getElementById('status-label');
 const joinBtn = document.getElementById('btn-join');
+const nameInput = document.getElementById('name-input');
+const countrySelect = document.getElementById('country-select');
+const setupForm = document.getElementById('setup-form');
+
 const overlaySetup = document.getElementById('overlay-setup');
 const hudContainer = document.getElementById('hud-container');
 const gameOverOverlay = document.getElementById('game-over-overlay');
+const lobbyWaitingCard = document.getElementById('lobby-waiting-card');
+const liveGameplayCard = document.getElementById('live-gameplay-card');
 
 // HUD elements
 const hudScore = document.getElementById('hud-score');
@@ -47,6 +62,16 @@ const hudTimer = document.getElementById('hud-timer');
 const hudMode = document.getElementById('hud-mode');
 const badgeDot = document.getElementById('badge-dot');
 const playerNameDisplay = document.getElementById('player-name');
+const playerFlagDisplay = document.getElementById('player-flag');
+const finalScoreVal = document.getElementById('final-score-val');
+
+// Helper: Convert 2-letter country code to flag emoji
+function countryCodeToFlagEmoji(cc) {
+  if (!cc || typeof cc !== 'string' || cc.length !== 2) return '🌐';
+  const upper = cc.toUpperCase();
+  const codePoints = [...upper].map(c => 127397 + c.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+}
 
 // --- AUTO-DETECT COUNTRY ---
 function detectUserCountry() {
@@ -72,45 +97,180 @@ function detectUserCountry() {
   return 'IN';
 }
 
+// --- INITIALIZATION ---
 window.addEventListener('DOMContentLoaded', () => {
-  connectWebSocket();
   setupTouchpad();
   
   // Pre-select detected country
   const detected = detectUserCountry();
-  const selectEl = document.getElementById('country-select');
-  if (selectEl) {
-    selectEl.value = detected;
+  if (countrySelect) {
+    countrySelect.value = detected;
   }
 
-  if (joinBtn) {
-    joinBtn.addEventListener('click', requestJoin);
+  // Bind form submit
+  if (setupForm) {
+    setupForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      requestJoin();
+    });
   }
+
+  // Connect to Dojo Server WebSocket
+  connectWebSocket();
 });
 
+// --- WEBSOCKET CONNECTION LIFECYCLE ---
+function connectWebSocket() {
+  if (socket && (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN)) {
+    return;
+  }
+
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
+  const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${wsProto}//${window.location.host}`;
+
+  updateStatus('connecting', 'Connecting to Dojo Server...');
+
+  try {
+    socket = new WebSocket(wsUrl);
+  } catch (err) {
+    console.error('WebSocket creation error:', err);
+    updateStatus('error', 'Connection error. Retrying...');
+    scheduleReconnect();
+    return;
+  }
+
+  socket.onopen = () => {
+    console.log('Connected to Dojo WebSocket Server at', wsUrl);
+    updateStatus('connected', 'Connected! Waiting for slot...');
+    
+    // If already registered before reconnect, re-register
+    if (isRegistered && playerId && playerName) {
+      socket.send(JSON.stringify({
+        type: 'register',
+        role: 'controller',
+        playerName: playerName,
+        country: playerCountry
+      }));
+    }
+  };
+
+  socket.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      
+      switch (data.type) {
+        case 'slotOffer':
+          handleSlotOffer(data);
+          break;
+          
+        case 'lobbyFull':
+          handleLobbyFull(data);
+          break;
+
+        case 'registered':
+          handleRegistration(data);
+          break;
+          
+        case 'gameSync':
+          handleGameSync(data);
+          break;
+          
+        case 'vibrate':
+          if (navigator.vibrate) {
+            navigator.vibrate(data.pattern || 40);
+          }
+          break;
+          
+        case 'error':
+          updateStatus('error', data.message || 'An error occurred');
+          if (joinBtn) joinBtn.disabled = true;
+          break;
+      }
+    } catch (e) {
+      console.error('Error handling server message:', e);
+    }
+  };
+
+  socket.onclose = () => {
+    console.warn('Socket closed. Scheduling reconnect...');
+    if (!isRegistered) {
+      updateStatus('error', 'Lost connection to Dojo. Reconnecting...');
+      if (joinBtn) joinBtn.disabled = true;
+    }
+    scheduleReconnect();
+  };
+
+  socket.onerror = (err) => {
+    console.warn('Socket encountered error:', err);
+    updateStatus('error', 'Connection failed. Reconnecting...');
+  };
+}
+
+function scheduleReconnect() {
+  if (reconnectTimer) return;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connectWebSocket();
+  }, 2000);
+}
+
+function updateStatus(state, message) {
+  if (!statusText) return;
+  statusText.className = 'status-msg';
+  if (state === 'connected') {
+    statusText.classList.add('connected');
+  } else if (state === 'error') {
+    statusText.classList.add('error');
+  }
+  if (statusLabel) {
+    statusLabel.innerText = message;
+  } else {
+    statusText.innerText = message;
+  }
+}
+
+// --- SLOT OFFER & JOIN FLOW ---
 function handleSlotOffer(data) {
   offeredPlayerId = data.playerId;
-  defaultPlayerName = data.placeholderName;
+  defaultPlayerName = data.placeholderName || `Ninja ${offeredPlayerId}`;
   
-  const nameInput = document.getElementById('name-input');
   if (nameInput) {
-    nameInput.placeholder = defaultPlayerName;
+    nameInput.placeholder = `e.g. ${defaultPlayerName}`;
+    nameInput.disabled = false;
   }
   
-  joinBtn.disabled = false;
-  statusText.innerText = 'Connected! Enter your name to play.';
+  if (joinBtn) {
+    joinBtn.disabled = false;
+    joinBtn.innerText = '⚔️ ENTER GAME';
+  }
+
+  const slotColors = { 1: 'Red', 2: 'Green', 3: 'Blue', 4: 'Yellow' };
+  const slotName = slotColors[offeredPlayerId] || `Slot ${offeredPlayerId}`;
+  updateStatus('connected', `🟢 Ready! Joined as ${slotName} Sword`);
 }
 
 function handleLobbyFull(data) {
-  statusText.innerText = data.message;
-  joinBtn.disabled = true;
+  updateStatus('error', data.message || 'Lobby full (4/4 players)');
+  if (joinBtn) {
+    joinBtn.disabled = true;
+    joinBtn.innerText = 'Lobby Full';
+  }
 }
 
 function requestJoin() {
-  if (joinBtn) joinBtn.disabled = true;
+  if (joinBtn && joinBtn.disabled) return;
+  if (joinBtn) {
+    joinBtn.disabled = true;
+    joinBtn.innerText = '⚔️ Entering...';
+  }
   vibrateTap();
   
-  // Try to go fullscreen for full immersive console feel (and to allow Safari/Chrome vibration & locks)
+  // Try to go fullscreen for immersive sword controller feel
   const docEl = document.documentElement;
   if (docEl.requestFullscreen) {
     docEl.requestFullscreen().catch(() => {});
@@ -118,13 +278,11 @@ function requestJoin() {
     docEl.webkitRequestFullscreen().catch(() => {});
   }
 
-  const nameInput = document.getElementById('name-input');
   let chosenName = nameInput ? nameInput.value.trim() : '';
   if (!chosenName) {
-    chosenName = defaultPlayerName || 'Ninja';
+    chosenName = defaultPlayerName || `Ninja ${offeredPlayerId || 1}`;
   }
 
-  const countrySelect = document.getElementById('country-select');
   const chosenCountry = countrySelect ? countrySelect.value : detectUserCountry();
 
   // Register with the server
@@ -135,7 +293,10 @@ function requestJoin() {
       playerName: chosenName,
       country: chosenCountry
     }));
-    statusText.innerText = 'Forging sword...';
+    updateStatus('connected', '⚔️ Forging sword & entering Dojo...');
+  } else {
+    updateStatus('error', 'Reconnecting to Dojo... please wait.');
+    connectWebSocket();
   }
 }
 
@@ -143,58 +304,134 @@ function handleRegistration(data) {
   playerId = data.playerId;
   playerColor = data.color;
   playerName = data.name;
+  playerCountry = data.country || 'IN';
   isRegistered = true;
 
-  // Visual modifications
-  touchPad.style.color = playerColor;
-  touchPad.classList.add('player-active');
+  // Visual styling modifications
+  if (touchPad) {
+    touchPad.style.color = playerColor;
+    touchPad.classList.add('player-active');
+  }
   
-  badgeDot.style.color = playerColor;
-  badgeDot.style.backgroundColor = playerColor;
-  playerNameDisplay.innerText = playerName;
-  playerNameDisplay.style.color = playerColor;
+  if (badgeDot) {
+    badgeDot.style.color = playerColor;
+    badgeDot.style.backgroundColor = playerColor;
+  }
+  if (playerNameDisplay) {
+    playerNameDisplay.innerText = playerName;
+    playerNameDisplay.style.color = playerColor;
+  }
+  if (playerFlagDisplay) {
+    playerFlagDisplay.innerText = countryCodeToFlagEmoji(playerCountry);
+  }
 
-  // Switch Screens
-  overlaySetup.classList.add('hidden');
-  hudContainer.classList.remove('hidden');
+  // Switch Screens: hide setup overlay, show active HUD
+  if (overlaySetup) overlaySetup.classList.add('hidden');
+  if (hudContainer) hudContainer.classList.remove('hidden');
+
+  // Request screen wake lock
+  requestWakeLock();
+}
+
+// --- START GAME & PLAY AGAIN FROM PHONE ---
+function requestStartGame() {
+  vibrateTap();
+  const btn = document.getElementById('btn-start-game');
+  if (btn) {
+    btn.innerText = '⚔️ Starting Match...';
+    btn.disabled = true;
+  }
+
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: 'startGame'
+    }));
+  }
+}
+
+function requestPlayAgain() {
+  vibrateTap();
+  if (gameOverOverlay) gameOverOverlay.classList.add('hidden');
+  if (hudContainer) hudContainer.classList.remove('hidden');
+
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: 'startGame'
+    }));
+  } else {
+    location.reload();
+  }
 }
 
 // --- REAL-TIME SCORE & TIMER SYNC ---
-
 function handleGameSync(data) {
   if (!isRegistered) return;
 
+  currentGameState = data.gameState || (data.gameOver ? 'GAMEOVER' : 'PLAYING');
+
   // Sync mode tags
-  hudMode.innerText = data.mode.toUpperCase();
-  hudTimer.classList.toggle('hidden', data.mode !== 'zen');
-  document.getElementById('hud-lives').classList.toggle('hidden', data.mode === 'zen');
+  if (hudMode && data.mode) {
+    hudMode.innerText = data.mode.toUpperCase();
+  }
+  if (hudTimer) {
+    hudTimer.classList.toggle('hidden', data.mode !== 'zen');
+  }
+  const livesEl = document.getElementById('hud-lives');
+  if (livesEl) {
+    livesEl.classList.toggle('hidden', data.mode === 'zen');
+  }
 
   // Update timer display
-  if (data.mode === 'zen') {
+  if (data.mode === 'zen' && hudTimer && data.timer !== undefined) {
     hudTimer.innerText = `${data.timer}s`;
   }
 
   // Find this specific player's score from sync packet
-  const activePlayerSync = data.players.find(p => p.id === playerId);
-  if (activePlayerSync) {
-    hudScore.innerText = activePlayerSync.score;
+  if (data.players && Array.isArray(data.players)) {
+    const activePlayerSync = data.players.find(p => p.id === playerId);
+    if (activePlayerSync && hudScore) {
+      hudScore.innerText = activePlayerSync.score;
+    }
   }
 
   // Sync Lives display (Classic)
-  if (data.mode === 'classic') {
+  if (data.mode === 'classic' && data.lives !== undefined) {
     const livesLeft = data.lives;
-    document.getElementById('heart-1').classList.toggle('lost', livesLeft < 1);
-    document.getElementById('heart-2').classList.toggle('lost', livesLeft < 2);
-    document.getElementById('heart-3').classList.toggle('lost', livesLeft < 3);
+    const h1 = document.getElementById('heart-1');
+    const h2 = document.getElementById('heart-2');
+    const h3 = document.getElementById('heart-3');
+    if (h1) h1.classList.toggle('lost', livesLeft < 1);
+    if (h2) h2.classList.toggle('lost', livesLeft < 2);
+    if (h3) h3.classList.toggle('lost', livesLeft < 3);
   }
 
-  // Handle Game Over
-  if (data.gameOver) {
-    gameOverOverlay.classList.remove('hidden');
-    hudContainer.classList.add('hidden');
-    document.getElementById('final-score-val').innerText = activePlayerSync ? activePlayerSync.score : '0';
+  // Toggle between Lobby waiting card and Live gameplay card
+  if (data.gameOver || data.gameState === 'GAMEOVER') {
+    if (gameOverOverlay) gameOverOverlay.classList.remove('hidden');
+    if (hudContainer) hudContainer.classList.add('hidden');
+    
+    let finalScore = '0';
+    if (data.players && Array.isArray(data.players)) {
+      const activePlayer = data.players.find(p => p.id === playerId);
+      if (activePlayer) finalScore = activePlayer.score;
+    }
+    if (finalScoreVal) finalScoreVal.innerText = finalScore;
+  } else if (data.gameState === 'LOBBY') {
+    if (gameOverOverlay) gameOverOverlay.classList.add('hidden');
+    if (hudContainer) hudContainer.classList.remove('hidden');
+    if (lobbyWaitingCard) lobbyWaitingCard.classList.remove('hidden');
+    if (liveGameplayCard) liveGameplayCard.classList.add('hidden');
+    const btn = document.getElementById('btn-start-game');
+    if (btn) {
+      btn.innerText = '⚔️ START GAME NOW';
+      btn.disabled = false;
+    }
   } else {
-    gameOverOverlay.classList.add('hidden');
+    // PLAYING state
+    if (gameOverOverlay) gameOverOverlay.classList.add('hidden');
+    if (hudContainer) hudContainer.classList.remove('hidden');
+    if (lobbyWaitingCard) lobbyWaitingCard.classList.add('hidden');
+    if (liveGameplayCard) liveGameplayCard.classList.remove('hidden');
   }
 }
 
@@ -213,6 +450,8 @@ async function requestWakeLock() {
 }
 
 function setupTouchpad() {
+  if (!touchPad) return;
+
   // Touch Handlers
   touchPad.addEventListener('touchstart', (e) => {
     e.preventDefault();
@@ -222,7 +461,6 @@ function setupTouchpad() {
     isTouching = true;
     const touch = e.touches[0];
     
-    // Normalize coordinates [0, 1]
     const x = Math.max(0, Math.min(1, touch.clientX / window.innerWidth));
     const y = Math.max(0, Math.min(1, touch.clientY / window.innerHeight));
 
@@ -234,9 +472,6 @@ function setupTouchpad() {
     spawnRipple(touch.clientX, touch.clientY);
   }, { passive: false });
 
-  let lastSocketSentTime = 0;
-  const THROTTLE_MS = 12; // ~83 updates/sec for responsive swipe data
-
   touchPad.addEventListener('touchmove', (e) => {
     e.preventDefault();
     if (!isRegistered || !isTouching) return;
@@ -246,12 +481,11 @@ function setupTouchpad() {
     const y = Math.max(0, Math.min(1, touch.clientY / window.innerHeight));
     const now = Date.now();
     
-    // Throttle WebSocket messages
+    // Throttle WebSocket messages for smooth 80-90 fps streaming
     if (now - lastSocketSentTime < THROTTLE_MS) {
       return;
     }
 
-    // Calculate swipe velocity over the throttled window
     const dt = (now - lastTime) || 1;
     const vx = (x - lastX) / dt;
     const vy = (y - lastY) / dt;
@@ -349,6 +583,7 @@ function sendTouchEvent(type, x, y, vx, vy, speed) {
 
 // Circular glow ripple on user touch
 function spawnRipple(clientX, clientY, isMini = false) {
+  if (!touchPad) return;
   const ripple = document.createElement('div');
   ripple.classList.add('ripple');
   
@@ -361,7 +596,6 @@ function spawnRipple(clientX, clientY, isMini = false) {
   
   touchPad.appendChild(ripple);
   
-  // Remove element after transition ends
   setTimeout(() => {
     ripple.remove();
   }, 400);
@@ -370,6 +604,6 @@ function spawnRipple(clientX, clientY, isMini = false) {
 // Light vibration tap helper
 function vibrateTap() {
   if (navigator.vibrate) {
-    navigator.vibrate(30);
+    navigator.vibrate(35);
   }
 }

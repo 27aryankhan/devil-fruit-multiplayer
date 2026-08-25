@@ -360,7 +360,7 @@ function initWebSocket(hostIp) {
           handleTouchEnd(data);
           break;
         case 'startGame':
-          if (gameState === 'LOBBY' && Object.keys(players).length > 0) {
+          if ((gameState === 'LOBBY' || gameState === 'GAMEOVER') && Object.keys(players).length > 0) {
             startGame();
           }
           break;
@@ -1006,6 +1006,7 @@ function syncGameState() {
     score: score, // combined total or base
     lives: lives,
     gameOver: gameState === 'GAMEOVER',
+    gameState: gameState, // 'LOBBY', 'PLAYING', 'GAMEOVER'
     mode: gameMode,
     timer: gameTimer,
     players: playerScoresSync
