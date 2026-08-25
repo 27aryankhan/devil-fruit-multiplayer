@@ -83,26 +83,13 @@
       <div class="mode-tag" id="hud-mode">Classic</div>
     </div>
 
-    <!-- Center Section: Lobby Waiting & Start Button OR Active Game Score -->
+    <!-- Centered Score / Timer -->
     <div class="hud-center">
-      <!-- Waiting in Lobby Card (shown if game hasn't started yet) -->
-      <div id="lobby-waiting-card" class="lobby-waiting-card">
-        <div class="lobby-waiting-badge">🛡️ SWORD READY</div>
-        <h2 style="font-size: 1.3rem; font-weight: 800; color: #fff; margin: 4px 0 2px 0;">You're in the Dojo!</h2>
-        <p style="font-size: 0.8rem; color: #94a3b8; margin: 0 0 14px 0;">Tap Start to begin match, or wait for host.</p>
-        <button type="button" class="action-btn start-match-btn" id="btn-start-game" onclick="requestStartGame()">
-          ⚔️ START GAME NOW
-        </button>
+      <div class="score-display">
+        <span class="label">SCORE</span>
+        <span class="value" id="hud-score">0</span>
       </div>
-
-      <!-- Live Gameplay Score & Timer -->
-      <div id="live-gameplay-card" class="live-gameplay-card hidden">
-        <div class="score-display">
-          <span class="label">SCORE</span>
-          <span class="value" id="hud-score">0</span>
-        </div>
-        <div class="timer-display hidden" id="hud-timer">90s</div>
-      </div>
+      <div class="timer-display hidden" id="hud-timer">90s</div>
     </div>
 
     <div class="hud-bottom">

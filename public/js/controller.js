@@ -53,8 +53,6 @@ const setupForm = document.getElementById('setup-form');
 const overlaySetup = document.getElementById('overlay-setup');
 const hudContainer = document.getElementById('hud-container');
 const gameOverOverlay = document.getElementById('game-over-overlay');
-const lobbyWaitingCard = document.getElementById('lobby-waiting-card');
-const liveGameplayCard = document.getElementById('live-gameplay-card');
 
 // HUD elements
 const hudScore = document.getElementById('hud-score');
@@ -333,22 +331,7 @@ function handleRegistration(data) {
   requestWakeLock();
 }
 
-// --- START GAME & PLAY AGAIN FROM PHONE ---
-function requestStartGame() {
-  vibrateTap();
-  const btn = document.getElementById('btn-start-game');
-  if (btn) {
-    btn.innerText = '⚔️ Starting Match...';
-    btn.disabled = true;
-  }
-
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({
-      type: 'startGame'
-    }));
-  }
-}
-
+// --- PLAY AGAIN FROM PHONE ---
 function requestPlayAgain() {
   vibrateTap();
   if (gameOverOverlay) gameOverOverlay.classList.add('hidden');
@@ -405,7 +388,7 @@ function handleGameSync(data) {
     if (h3) h3.classList.toggle('lost', livesLeft < 3);
   }
 
-  // Toggle between Lobby waiting card and Live gameplay card
+  // Handle Game Over
   if (data.gameOver || data.gameState === 'GAMEOVER') {
     if (gameOverOverlay) gameOverOverlay.classList.remove('hidden');
     if (hudContainer) hudContainer.classList.add('hidden');
@@ -416,22 +399,9 @@ function handleGameSync(data) {
       if (activePlayer) finalScore = activePlayer.score;
     }
     if (finalScoreVal) finalScoreVal.innerText = finalScore;
-  } else if (data.gameState === 'LOBBY') {
-    if (gameOverOverlay) gameOverOverlay.classList.add('hidden');
-    if (hudContainer) hudContainer.classList.remove('hidden');
-    if (lobbyWaitingCard) lobbyWaitingCard.classList.remove('hidden');
-    if (liveGameplayCard) liveGameplayCard.classList.add('hidden');
-    const btn = document.getElementById('btn-start-game');
-    if (btn) {
-      btn.innerText = '⚔️ START GAME NOW';
-      btn.disabled = false;
-    }
   } else {
-    // PLAYING state
     if (gameOverOverlay) gameOverOverlay.classList.add('hidden');
     if (hudContainer) hudContainer.classList.remove('hidden');
-    if (lobbyWaitingCard) lobbyWaitingCard.classList.add('hidden');
-    if (liveGameplayCard) liveGameplayCard.classList.remove('hidden');
   }
 }
 
