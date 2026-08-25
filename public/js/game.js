@@ -360,7 +360,7 @@ function initWebSocket(hostIp) {
           handleTouchEnd(data);
           break;
         case 'startGame':
-          if ((gameState === 'LOBBY' || gameState === 'GAMEOVER') && Object.keys(players).length > 0) {
+          if (gameState === 'LOBBY' || gameState === 'GAMEOVER') {
             startGame();
           }
           break;
@@ -527,6 +527,11 @@ function handleTouchStart(data) {
   if (players[pId].comboTimer) {
     clearTimeout(players[pId].comboTimer);
     players[pId].comboTimer = null;
+  }
+
+  // If match hasn't started yet, auto-start on first touch/swipe
+  if (gameState === 'LOBBY') {
+    startGame();
   }
 
   // Check if finger landed directly on a fruit (tap-to-slice)

@@ -291,6 +291,9 @@ function requestJoin() {
       playerName: chosenName,
       country: chosenCountry
     }));
+    socket.send(JSON.stringify({
+      type: 'startGame'
+    }));
     updateStatus('connected', '⚔️ Forging sword & entering Dojo...');
   } else {
     updateStatus('error', 'Reconnecting to Dojo... please wait.');
@@ -326,6 +329,13 @@ function handleRegistration(data) {
   // Switch Screens: hide setup overlay, show active HUD
   if (overlaySetup) overlaySetup.classList.add('hidden');
   if (hudContainer) hudContainer.classList.remove('hidden');
+
+  // Trigger game start on main screen upon joining
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: 'startGame'
+    }));
+  }
 
   // Request screen wake lock
   requestWakeLock();
