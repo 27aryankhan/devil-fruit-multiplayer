@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🗡️ DOJO BLADE: DEVIL FRUITS
+# DOJO BLADE: DEVIL FRUITS
 
 ### *Real-Time Multiplayer Fruit Slicing Game with Smartphone Sword Controllers*
 
@@ -19,29 +19,29 @@
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
-- 📱 **Zero-Install Smartphone Controller**: Simply scan the on-screen QR code with your iPhone or Android camera to instantly pair your phone as a high-speed sword controller.
-- 👥 **4-Player Real-time Multiplayer**: Supports up to 4 simultaneous slayers with distinct neon identities (Neon Pink, Neon Green, Neon Blue, Neon Yellow), custom player tags, and a live synchronized HUD.
-- ⚡ **Ultra-Low Latency WebSocket Engine**: Real-time packet streaming (60+ updates/sec) with sub-pixel swipe interpolation (`STEP_SIZE`) so high-speed slashes never skip a fruit.
-- 🍉 **Procedural 3D Vector Fruit Models**: Dynamic rendering of Watermelons, Pineapples, Oranges, Lemons, and Strawberries with seeds, rinds, pulp segments, and split-half rotational physics upon impact.
-- 💥 **Explosive Particle & Splat VFX**: Starburst juice splatters on background arena walls, glowing blade trails with intense white energy cores, spark fuse animations, and screen shake.
-- 📳 **Mobile Haptic Feedback**: Vibrates physically in your hand via `navigator.vibrate` when slicing fruits, landing 3+ fruit combos, or striking hazard bombs.
-- 🎵 **Procedural Web Audio Synthesizer**: Pure math-based Web Audio synthesizer generating real-time blade swishes, squishy fruit crunches, bomb blasts, and ambient pentatonic background music (0 external audio dependencies).
-- 🛡️ **Production-Grade Security**: Built-in Content Security Policy (CSP), XSS input sanitization, WebSocket payload caps (4KB), per-connection rate limiting, and path traversal defenses.
+- **Zero-Install Smartphone Controller**: Simply scan the on-screen QR code with your iPhone or Android camera to instantly pair your phone as a high-speed sword controller.
+- **4-Player Real-time Multiplayer**: Supports up to 4 simultaneous slayers with distinct neon identities (Neon Pink, Neon Green, Neon Blue, Neon Yellow), custom player tags, and a live synchronized HUD.
+- **Ultra-Low Latency WebSocket Engine**: Real-time packet streaming (60+ updates/sec) with sub-pixel swipe interpolation (`STEP_SIZE`) so high-speed slashes never skip a fruit.
+- **Procedural 3D Vector Fruit Models**: Dynamic rendering of Watermelons, Pineapples, Oranges, Lemons, and Strawberries with seeds, rinds, pulp segments, and split-half rotational physics upon impact.
+- **Explosive Particle & Splat VFX**: Starburst juice splatters on background arena walls, glowing blade trails with intense white energy cores, spark fuse animations, and screen shake.
+- **Mobile Haptic Feedback**: Vibrates physically in your hand via `navigator.vibrate` when slicing fruits, landing 3+ fruit combos, or striking hazard bombs.
+- **Procedural Web Audio Synthesizer**: Pure math-based Web Audio synthesizer generating real-time blade swishes, squishy fruit crunches, bomb blasts, and ambient pentatonic background music (0 external audio dependencies).
+- **Production-Grade Security**: Built-in Content Security Policy (CSP), XSS input sanitization, WebSocket payload caps (4KB), per-connection rate limiting, and path traversal defenses.
 
 ---
 
-## 🎮 Game Modes
+## Game Modes
 
 | Mode | Rules & Mechanics |
 | :--- | :--- |
-| **⚔️ Classic Mode** | 3 Lives. Dropping whole fruits costs 1 life. Hazard bombs terminate the game immediately. High stakes, pure adrenaline. |
-| **🧘 Zen Mode** | 90-Second timer. No falling fruit penalties. Bomb strikes deduct 10 points instead of ending the game. Pure slicing frenzy. |
+| **Classic Mode** | 3 Lives. Dropping whole fruits costs 1 life. Hazard bombs terminate the game immediately. High stakes, pure adrenaline. |
+| **Zen Mode** | 90-Second timer. No falling fruit penalties. Bomb strikes deduct 10 points instead of ending the game. Pure slicing frenzy. |
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ```
                       ┌──────────────────────────────────────────────┐
@@ -53,18 +53,18 @@
                       └──────────────────────┬───────────────────────┘
                                              │
                        WebSocket (LAN/WAN) ──┴── WebSocket (LAN/WAN)
-                      ┌──────────────────────┐  ┌──────────────────────┐
-                      │   Main Display Screen│  │  Mobile Controllers  │
-                      │  - Canvas 2D Engine  │  │ - Fullscreen Touchpad│
-                      │  - Physics & Combos  │  │ - Motion Throttle    │
-                      │  - Procedural Audio  │  │ - Haptic Vibration   │
-                      │  (Laptop / Monitor)  │  │ (Up to 4 Smartphones)│
-                      └──────────────────────┘  └──────────────────────┘
+                       ┌──────────────────────┐  ┌──────────────────────┐
+                       │   Main Display Screen│  │  Mobile Controllers  │
+                       │  - Canvas 2D Engine  │  │ - Fullscreen Touchpad│
+                       │  - Physics & Combos  │  │ - Motion Throttle    │
+                       │  - Procedural Audio  │  │ - Haptic Vibration   │
+                       │  (Laptop / Monitor)  │  │ (Up to 4 Smartphones)│
+                       └──────────────────────┘  └──────────────────────┘
 ```
 
 ---
 
-## 🚀 Quickstart & Installation
+## Quickstart & Installation
 
 ### 1. Clone the repository
 ```bash
@@ -89,7 +89,7 @@ npm start
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 - **Backend**: Node.js, `ws` (WebSockets), `http`, `os`, `fs`, `path`
 - **Frontend Display**: HTML5 Canvas 2D, Vanilla JavaScript (ES6+), CSS Glassmorphism
@@ -99,7 +99,7 @@ npm start
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
 ├── public/
@@ -121,20 +121,14 @@ npm start
 
 ---
 
-## 🌐 Deployment
+## Deployment
 
 This project is ready to deploy with persistent WebSockets on any cloud platform:
 
 - **[Render.com](https://render.com)**: Create a **Web Service**, connect your GitHub repo, set Build Command to `npm install` and Start Command to `npm start`.
-- **[DigitalOcean](https://digitalocean.com)**: Deploy via App Platform or Droplet using your GitHub Student Pack credits.
-- **[Railway.app](https://railway.app)**: 1-click GitHub deployment with automatic SSL & WebSocket proxy.
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the [MIT License](LICENSE).
-
-<div align="center">
-  <b>Forged with ❤️ by <a href="https://github.com/27aryankhan">Aryan Khan</a></b>
-</div>
