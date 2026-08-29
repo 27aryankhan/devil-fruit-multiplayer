@@ -341,10 +341,10 @@ function handleSlotOffer(data) {
 }
 
 function handleLobbyFull(data) {
-  updateStatus('error', data.message || 'Lobby full (4/4 players)');
+  updateStatus('error', data.message || 'All 4 player slots are occupied. Please wait for an open slot.');
   if (joinBtn) {
     joinBtn.disabled = true;
-    joinBtn.innerText = 'Lobby Full';
+    joinBtn.innerText = 'Lobby Full (4/4)';
   }
 }
 

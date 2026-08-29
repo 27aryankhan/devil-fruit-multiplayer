@@ -41,15 +41,17 @@
               </ol>
             </div>
             <div id="offline-instructions" style="display: none; padding: 15px; border-radius: 12px; background: rgba(255, 51, 102, 0.1); border: 1px solid rgba(255, 51, 102, 0.3);">
-              <h3 style="color: #ff3366; margin-top: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">⚠️ Dojo Server is Offline</h3>
-              <p style="font-size: 0.85rem; line-height: 1.4; color: #cbd5e1; margin: 0 0 10px 0;">
-                To play, the background Dojo Server must be running on your laptop.
+              <h3 style="color: #ff3366; margin-top: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">⚠️ Dojo is Offline</h3>
+              <p style="font-size: 0.85rem; line-height: 1.4; color: #cbd5e1; margin: 0 0 8px 0;">
+                Dojo server is offline. Start the server to play.
               </p>
-              <h4 style="margin: 0 0 6px 0; color: #fff; font-size: 0.85rem;">How to Start the Server:</h4>
-              <ul style="font-size: 0.8rem; padding-left: 20px; margin: 0; color: #94a3b8; line-height: 1.4;">
-                <li>Double-click the <strong style="color: #ff3366;">Start Dojo Blade.command</strong> file in the game folder.</li>
-                <li>If you get a permission error, open Terminal, drag the file into it, and run:<br><code style="background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px; font-family: monospace; display: inline-block; margin-top: 4px; color: #fff;">chmod +x "Start Dojo Blade.command"</code></li>
-              </ul>
+              <details style="font-size: 0.8rem; color: #94a3b8; cursor: pointer;">
+                <summary style="color: #fbbf24; font-weight: 600; margin-bottom: 6px;">🛠️ Developer Setup & Startup Guide</summary>
+                <ul style="padding-left: 20px; margin: 6px 0 0 0; color: #94a3b8; line-height: 1.4;">
+                  <li>Double-click the <strong style="color: #ff3366;">Start Dojo Blade.command</strong> file in the game folder.</li>
+                  <li>Or in Terminal, run:<br><code style="background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px; font-family: monospace; display: inline-block; margin-top: 4px; color: #fff;">node server.js</code></li>
+                </ul>
+              </details>
             </div>
           </div>
         </div>
