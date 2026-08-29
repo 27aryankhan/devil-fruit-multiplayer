@@ -157,6 +157,20 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Live input validation feedback
+  if (nameInput) {
+    nameInput.addEventListener('input', () => {
+      const errorHint = document.getElementById('name-error-hint');
+      const parts = nameInput.value.trim().split(/\s+/).filter(p => p.length > 0);
+      if (parts.length >= 2 && parts[0].length >= 2 && parts[1].length >= 2) {
+        if (errorHint) errorHint.style.display = 'none';
+        nameInput.style.borderColor = '#33ff66';
+      } else {
+        nameInput.style.borderColor = '';
+      }
+    });
+  }
+
   // Connect to Dojo Server WebSocket
   connectWebSocket();
 });
@@ -279,10 +293,9 @@ function updateStatus(state, message) {
 // --- SLOT OFFER & JOIN FLOW ---
 function handleSlotOffer(data) {
   offeredPlayerId = data.playerId;
-  defaultPlayerName = data.placeholderName || `Ninja ${offeredPlayerId}`;
   
   if (nameInput) {
-    nameInput.placeholder = `e.g. ${defaultPlayerName}`;
+    nameInput.placeholder = 'e.g. John Doe';
     nameInput.disabled = false;
   }
   
@@ -305,6 +318,33 @@ function handleLobbyFull(data) {
 }
 
 function requestJoin() {
+  const nameErrorHint = document.getElementById('name-error-hint');
+  const chosenName = nameInput ? nameInput.value.trim() : '';
+
+  // VALIDATION: First & Last Name are compulsory (at least 2 words, >= 2 characters each)
+  const nameParts = chosenName.split(/\s+/).filter(part => part.length > 0);
+  if (nameParts.length < 2 || nameParts[0].length < 2 || nameParts[1].length < 2) {
+    if (nameErrorHint) {
+      nameErrorHint.style.display = 'block';
+    }
+    if (nameInput) {
+      nameInput.style.borderColor = '#ff3366';
+      nameInput.focus();
+    }
+    if (joinBtn) {
+      joinBtn.disabled = false;
+      joinBtn.innerText = '⚔️ ENTER GAME';
+    }
+    if (navigator.vibrate) {
+      navigator.vibrate([80, 50, 80]);
+    }
+    return;
+  }
+
+  // Clear any error state
+  if (nameErrorHint) nameErrorHint.style.display = 'none';
+  if (nameInput) nameInput.style.borderColor = '#33ff66';
+
   if (joinBtn && joinBtn.disabled) return;
   if (joinBtn) {
     joinBtn.disabled = true;
@@ -318,11 +358,6 @@ function requestJoin() {
     docEl.requestFullscreen().catch(() => {});
   } else if (docEl.webkitRequestFullscreen) {
     docEl.webkitRequestFullscreen().catch(() => {});
-  }
-
-  let chosenName = nameInput ? nameInput.value.trim() : '';
-  if (!chosenName) {
-    chosenName = defaultPlayerName || `Ninja ${offeredPlayerId || 1}`;
   }
 
   const chosenCountry = countrySelect ? countrySelect.value : detectUserCountry();

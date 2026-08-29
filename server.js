@@ -13,14 +13,14 @@ const PUBLIC_DIR = path.resolve(path.join(__dirname, 'public'));
 
 // Strip all HTML/script tags and limit to safe characters
 function sanitizePlayerName(name) {
-  if (typeof name !== 'string') return 'Ninja';
+  if (typeof name !== 'string') return 'Player';
   // Remove any HTML tags
   let clean = name.replace(/<[^>]*>/g, '');
   // Remove dangerous characters (keep alphanumeric, spaces, hyphens, underscores, emojis)
   clean = clean.replace(/[^\w\s\-_.\u{1F300}-\u{1FAD6}\u{2600}-\u{27BF}]/gu, '');
-  // Trim and limit length
-  clean = clean.trim().substring(0, 16);
-  return clean || 'Ninja';
+  // Normalize whitespace (single spaces between names) and limit length
+  clean = clean.replace(/\s+/g, ' ').trim().substring(0, 26);
+  return clean || 'Player';
 }
 
 // Validate that a value is a finite number within a range
@@ -660,11 +660,7 @@ wss.on('connection', (ws, req) => {
                 
                 if (data.playerName) {
                   const safeName = sanitizePlayerName(data.playerName);
-                  if (safeName.startsWith('Ninja ') && safeName !== `Ninja ${slot.id}`) {
-                    slot.name = `Ninja ${slot.id}`;
-                  } else {
-                    slot.name = safeName;
-                  }
+                  slot.name = safeName;
                 }
                 
                 slot.country = data.country || getClientCountry(req);
