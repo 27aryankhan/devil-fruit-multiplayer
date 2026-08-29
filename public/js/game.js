@@ -256,7 +256,10 @@ window.addEventListener('DOMContentLoaded', () => {
         const controllerUrl = isLiveDomain ? `${window.location.origin}/controller.html` : data.controllerUrl;
 
         const connUrlEl = document.getElementById('connection-url');
-        if (connUrlEl) connUrlEl.innerText = controllerUrl;
+        if (connUrlEl) {
+          connUrlEl.innerText = controllerUrl;
+          connUrlEl.href = controllerUrl;
+        }
         const qrLoaderEl = document.getElementById('qr-loader');
         if (qrLoaderEl) qrLoaderEl.style.display = 'none';
 
@@ -363,6 +366,11 @@ function initWebSocket(hostIp) {
             startGame();
           }
           break;
+        case 'leaderboardUpdate':
+          if (data.mode === currentLeaderboardMode) {
+            renderLeaderboard(data.leaderboard, data.stats);
+          }
+          break;
       }
     } catch (e) {
       console.error('Error handling WS message:', e);
@@ -422,6 +430,13 @@ setInterval(() => {
     }
   }
 }, 3000);
+
+// Auto-refresh leaderboard every 10 seconds while in lobby to show live global records
+setInterval(() => {
+  if (gameState === 'LOBBY') {
+    fetchLeaderboard(currentLeaderboardMode);
+  }
+}, 10000);
 
 // --- MULTIPLAYER LOBBY HUB ---
 
@@ -953,10 +968,13 @@ function endGame() {
               recordBanner.classList.remove('hidden');
             }
             audio.playHighscoreFanfare();
-            fetchLeaderboard(gameMode);
           }
+          fetchLeaderboard(gameMode);
         })
-        .catch(err => console.warn('Score submission notice:', err));
+        .catch(err => {
+          console.warn('Score submission notice:', err);
+          fetchLeaderboard(gameMode);
+        });
       }
     });
   }
