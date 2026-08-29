@@ -201,31 +201,15 @@ function isMaliciousUrl(url) {
 const LEADERBOARD_FILE = path.join(__dirname, 'leaderboard.json');
 
 const DEFAULT_LEADERBOARD = {
-  classic: [
-    { id: 'c1', name: 'Roronoa Zoro', score: 342, combo: 6, country: 'JP', date: '2026-08-28' },
-    { id: 'c2', name: 'Monkey D. Luffy', score: 298, combo: 5, country: 'BR', date: '2026-08-28' },
-    { id: 'c3', name: 'Trafalgar Law', score: 265, combo: 4, country: 'DE', date: '2026-08-27' },
-    { id: 'c4', name: 'Portgas D. Ace', score: 240, combo: 5, country: 'US', date: '2026-08-27' },
-    { id: 'c5', name: 'Vinsmoke Sanji', score: 215, combo: 4, country: 'FR', date: '2026-08-26' },
-    { id: 'c6', name: 'Kozuki Oden', score: 195, combo: 3, country: 'JP', date: '2026-08-25' },
-    { id: 'c7', name: 'Dracule Mihawk', score: 180, combo: 4, country: 'ES', date: '2026-08-25' },
-    { id: 'c8', name: 'Silvers Rayleigh', score: 165, combo: 3, country: 'GB', date: '2026-08-24' }
-  ],
-  zen: [
-    { id: 'z1', name: 'Monkey D. Luffy', score: 410, combo: 8, country: 'BR', date: '2026-08-28' },
-    { id: 'z2', name: 'Roronoa Zoro', score: 385, combo: 7, country: 'JP', date: '2026-08-28' },
-    { id: 'z3', name: 'Shanks', score: 350, combo: 6, country: 'US', date: '2026-08-27' },
-    { id: 'z4', name: 'Yamato', score: 310, combo: 5, country: 'JP', date: '2026-08-26' },
-    { id: 'z5', name: 'Marco the Phoenix', score: 280, combo: 5, country: 'IT', date: '2026-08-25' },
-    { id: 'z6', name: 'Edward Newgate', score: 255, combo: 4, country: 'JP', date: '2026-08-24' }
-  ],
+  classic: [],
+  zen: [],
   stats: {
-    totalMatches: 48,
-    totalFruitsSliced: 1240
+    totalMatches: 0,
+    totalFruitsSliced: 0
   }
 };
 
-let leaderboardData = JSON.parse(JSON.stringify(DEFAULT_LEADERBOARD));
+let leaderboardData = { classic: [], zen: [], stats: { totalMatches: 0, totalFruitsSliced: 0 } };
 
 function loadLeaderboard() {
   try {
@@ -233,22 +217,17 @@ function loadLeaderboard() {
       const raw = fs.readFileSync(LEADERBOARD_FILE, 'utf8');
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
-        leaderboardData.classic = Array.isArray(parsed.classic) && parsed.classic.length > 0
-          ? parsed.classic 
-          : [...DEFAULT_LEADERBOARD.classic];
-        leaderboardData.zen = Array.isArray(parsed.zen) && parsed.zen.length > 0 
-          ? parsed.zen 
-          : [...DEFAULT_LEADERBOARD.zen];
-        leaderboardData.stats = parsed.stats && (parsed.stats.totalMatches || parsed.stats.totalFruitsSliced)
-          ? parsed.stats
-          : { ...DEFAULT_LEADERBOARD.stats };
+        leaderboardData.classic = Array.isArray(parsed.classic) ? parsed.classic : [];
+        leaderboardData.zen = Array.isArray(parsed.zen) ? parsed.zen : [];
+        leaderboardData.stats = parsed.stats || { totalMatches: 0, totalFruitsSliced: 0 };
       }
     } else {
+      leaderboardData = { classic: [], zen: [], stats: { totalMatches: 0, totalFruitsSliced: 0 } };
       saveLeaderboard();
     }
   } catch (err) {
-    console.error('Error loading leaderboard.json, using defaults:', err);
-    leaderboardData = JSON.parse(JSON.stringify(DEFAULT_LEADERBOARD));
+    console.error('Error loading leaderboard.json:', err);
+    leaderboardData = { classic: [], zen: [], stats: { totalMatches: 0, totalFruitsSliced: 0 } };
   }
 }
 
