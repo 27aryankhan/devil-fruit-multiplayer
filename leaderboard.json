@@ -71,6 +71,38 @@
       "combo": 3,
       "country": "GB",
       "date": "2026-08-24"
+    },
+    {
+      "id": "mtdqll8802tj",
+      "name": "Naruto",
+      "score": 150,
+      "combo": 3,
+      "country": "JP",
+      "date": "2026-08-29"
+    },
+    {
+      "id": "mtdqll8jxlfr",
+      "name": "Sasuke",
+      "score": 140,
+      "combo": 3,
+      "country": "JP",
+      "date": "2026-08-29"
+    },
+    {
+      "id": "mtdqll8tfxcd",
+      "name": "Sakura",
+      "score": 120,
+      "combo": 2,
+      "country": "JP",
+      "date": "2026-08-29"
+    },
+    {
+      "id": "mtdqll93zzs0",
+      "name": "Kakashi",
+      "score": 110,
+      "combo": 2,
+      "country": "JP",
+      "date": "2026-08-29"
     }
   ],
   "zen": [
@@ -124,7 +156,7 @@
     }
   ],
   "stats": {
-    "totalMatches": 49,
-    "totalFruitsSliced": 1350
+    "totalMatches": 53,
+    "totalFruitsSliced": 1510
   }
 }

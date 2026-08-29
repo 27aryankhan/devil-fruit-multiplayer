@@ -384,9 +384,11 @@ body {
 
 .lb-rank {
   font-weight: 800;
-  width: 24px;
+  min-width: 28px;
+  width: auto;
   text-align: center;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
+  flex-shrink: 0;
 }
 .lb-row.rank-1 .lb-rank { color: #ffcc33; }
 .lb-row.rank-2 .lb-rank { color: #d1d5db; }

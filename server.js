@@ -265,7 +265,7 @@ function saveLeaderboard() {
 // Broadcast updated leaderboard to active screens
 function broadcastLeaderboardUpdate(mode) {
   const targetMode = mode === 'zen' ? 'zen' : 'classic';
-  const list = (leaderboardData[targetMode] || []).slice(0, 10).map((entry, idx) => ({
+  const list = (leaderboardData[targetMode] || []).map((entry, idx) => ({
     rank: idx + 1,
     name: entry.name,
     score: entry.score,
@@ -396,7 +396,7 @@ const server = http.createServer((req, res) => {
   if (filePath.startsWith('/api/leaderboard') && req.method === 'GET') {
     const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const mode = urlObj.searchParams.get('mode') === 'zen' ? 'zen' : 'classic';
-    const list = (leaderboardData[mode] || []).slice(0, 10).map((entry, idx) => ({
+    const list = (leaderboardData[mode] || []).map((entry, idx) => ({
       rank: idx + 1,
       name: entry.name,
       score: entry.score,
@@ -463,9 +463,21 @@ const server = http.createServer((req, res) => {
         };
 
         if (!leaderboardData[mode]) leaderboardData[mode] = [];
-        leaderboardData[mode].push(newEntry);
+        
+        // Find existing record by player name to keep personal best
+        const existingIdx = leaderboardData[mode].findIndex(
+          e => e.name.trim().toLowerCase() === name.toLowerCase()
+        );
+
+        if (existingIdx !== -1) {
+          if (score >= leaderboardData[mode][existingIdx].score) {
+            leaderboardData[mode][existingIdx] = newEntry;
+          }
+        } else {
+          leaderboardData[mode].push(newEntry);
+        }
+
         leaderboardData[mode].sort((a, b) => b.score - a.score);
-        leaderboardData[mode] = leaderboardData[mode].slice(0, 50); // Keep top 50
 
         // Update overall stats
         leaderboardData.stats = leaderboardData.stats || { totalMatches: 0, totalFruitsSliced: 0 };
@@ -475,7 +487,7 @@ const server = http.createServer((req, res) => {
         saveLeaderboard();
         broadcastLeaderboardUpdate(mode);
 
-        const rank = leaderboardData[mode].findIndex(e => e.id === newEntry.id) + 1;
+        const rank = leaderboardData[mode].findIndex(e => e.name.trim().toLowerCase() === name.toLowerCase()) + 1;
         const isTop10 = rank > 0 && rank <= 10;
         const isNewRecord = rank === 1;
 

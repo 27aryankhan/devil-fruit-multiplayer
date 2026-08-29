@@ -138,7 +138,7 @@ function renderLeaderboard(items, stats) {
 
     const rankSpan = document.createElement('span');
     rankSpan.className = 'lb-rank';
-    rankSpan.textContent = item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : `#${item.rank}`;
+    rankSpan.textContent = item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : `#${item.rank.toLocaleString()}`;
 
     const flagSpan = document.createElement('span');
     flagSpan.className = 'lb-flag';
