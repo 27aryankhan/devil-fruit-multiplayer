@@ -227,8 +227,40 @@ const FRUIT_TYPES = {
     juiceColor: '#ffd700',
     points: 3,
     drawType: 'pineapple'
+  },
+  ice_fruit: {
+    name: 'ice_fruit',
+    displayName: '🧊 Hie Hie Fruit',
+    radius: 50,
+    skinColor: '#00e5ff',
+    fleshColor: '#e0f8ff',
+    juiceColor: '#00f0ff',
+    points: 10,
+    drawType: 'ice_fruit',
+    isDevilFruit: true,
+    power: 'freeze'
+  },
+  lightning_fruit: {
+    name: 'lightning_fruit',
+    displayName: '⚡ Goro Goro Fruit',
+    radius: 50,
+    skinColor: '#ffd700',
+    fleshColor: '#fffbeb',
+    juiceColor: '#ffcc00',
+    points: 10,
+    drawType: 'lightning_fruit',
+    isDevilFruit: true,
+    power: 'lightning'
   }
 };
+
+// --- DEVIL FRUIT POWER STATE ---
+let isFreezeActive = false;
+let freezeEndTime = 0;
+let isFrenzyActive = false;
+let frenzyEndTime = 0;
+let lastFrenzySpawn = 0;
+let powerBanner = null; // { title, subtitle, color, expires }
 
 // --- INITIALIZATION ---
 
@@ -791,6 +823,14 @@ function startGame() {
   matchStartTime = Date.now();
   matchFruitsSliced = 0;
 
+  // Reset Devil Fruit Power State
+  isFreezeActive = false;
+  freezeEndTime = 0;
+  isFrenzyActive = false;
+  frenzyEndTime = 0;
+  lastFrenzySpawn = 0;
+  powerBanner = null;
+
   // Reset player scores and re-initialize per-player trail trackers
   Object.keys(players).forEach(pId => {
     players[pId].score = 0;
@@ -863,6 +903,9 @@ function restartGame() {
 
 function returnToLobby() {
   gameState = 'LOBBY';
+  isFreezeActive = false;
+  isFrenzyActive = false;
+  powerBanner = null;
   document.getElementById('game-over').classList.add('hidden');
   document.getElementById('lobby').classList.remove('hidden');
   document.getElementById('hud').classList.add('hidden');
@@ -873,6 +916,9 @@ function returnToLobby() {
 function endGame() {
   if (gameState === 'GAMEOVER') return;
   gameState = 'GAMEOVER';
+  isFreezeActive = false;
+  isFrenzyActive = false;
+  powerBanner = null;
   clearInterval(spawnInterval);
   if (timerInterval) clearInterval(timerInterval);
   
@@ -1051,9 +1097,11 @@ function spawnWave() {
   if (gameState !== 'PLAYING') return;
 
   const playerCount = Math.max(1, Object.keys(players).length);
-  // Spawn between 2 and 4 items per wave (up to 5 for multiplayers)
-  const count = Math.floor(Math.random() * (playerCount > 1 ? 3 : 2)) + (playerCount > 1 ? 2 : 1);
-  const bombChance = gameMode === 'zen' ? 0 : 0.22;
+  // During lightning frenzy, launch extra fruits with 0 bombs
+  const count = isFrenzyActive
+    ? Math.floor(Math.random() * 3) + 4
+    : Math.floor(Math.random() * (playerCount > 1 ? 3 : 2)) + (playerCount > 1 ? 2 : 1);
+  const bombChance = (gameMode === 'zen' || isFrenzyActive) ? 0 : 0.22;
 
   let bombSpawned = false;
   for (let i = 0; i < count; i++) {
@@ -1065,14 +1113,21 @@ function spawnWave() {
       } else {
         spawnFruit();
       }
-    }, i * 160); // Stagger launch slightly in the wave
+    }, i * (isFrenzyActive ? 110 : 160));
   }
 }
 
-function spawnFruit() {
-  const types = Object.keys(FRUIT_TYPES);
-  const randomType = types[Math.floor(Math.random() * types.length)];
-  const config = FRUIT_TYPES[randomType];
+function spawnFruit(forceRegular = false) {
+  const normalTypes = ['watermelon', 'orange', 'lemon', 'strawberry', 'pineapple'];
+  
+  // Chance to spawn Devil Fruit (14% chance if no power is currently active)
+  let chosenType;
+  if (!forceRegular && !isFreezeActive && !isFrenzyActive && Math.random() < 0.14) {
+    chosenType = Math.random() < 0.5 ? 'ice_fruit' : 'lightning_fruit';
+  } else {
+    chosenType = normalTypes[Math.floor(Math.random() * normalTypes.length)];
+  }
+  const config = FRUIT_TYPES[chosenType] || FRUIT_TYPES.watermelon;
 
   // Spawn position across bottom width
   const margin = canvas.width * 0.12;
@@ -1124,7 +1179,7 @@ function spawnBomb() {
   });
 }
 
-// Slicing logic
+  // Slicing logic
 function sliceFruit(fruit, playerId, position) {
   const player = players[playerId];
   if (!player) return;
@@ -1135,13 +1190,46 @@ function sliceFruit(fruit, playerId, position) {
   playerScores[playerId] = (playerScores[playerId] || 0) + fruit.points;
   audio.playSplat();
 
+  // Handle Devil Fruit Powers
+  if (fruit.drawType === 'ice_fruit') {
+    isFreezeActive = true;
+    freezeEndTime = Date.now() + 4000;
+    audio.playFreeze();
+    powerBanner = {
+      title: '🧊 HIE HIE NO MI!',
+      subtitle: '4s SLOW MOTION FREEZE',
+      color: '#00f0ff',
+      expires: Date.now() + 3500
+    };
+    requestVibrate(playerId, [40, 30, 40, 30, 100]);
+  } else if (fruit.drawType === 'lightning_fruit') {
+    isFrenzyActive = true;
+    frenzyEndTime = Date.now() + 5000;
+    audio.playLightning();
+    powerBanner = {
+      title: '⚡ GORO GORO NO MI!',
+      subtitle: '5s LIGHTNING FRENZY BURST',
+      color: '#ffd700',
+      expires: Date.now() + 3500
+    };
+    requestVibrate(playerId, [70, 30, 70, 30, 120]);
+    // Launch immediate burst wave
+    for (let k = 0; k < 6; k++) {
+      setTimeout(() => {
+        if (gameState === 'PLAYING') spawnFruit(true);
+      }, k * 100);
+    }
+  }
+
   // Queue for combo verification
   player.activeCombo.push(fruit.name);
   if (player.comboTimer) clearTimeout(player.comboTimer);
   player.comboTimer = setTimeout(() => checkCombo(playerId), 250);
 
   // Haptic tap on phone
-  requestVibrate(playerId, [35]);
+  if (!fruit.isDevilFruit) {
+    requestVibrate(playerId, [35]);
+  }
 
   // Update HUD values
   updateHUD();
@@ -1305,13 +1393,59 @@ function gameLoop(timestamp) {
 }
 
 function updatePhysics() {
+  const now = Date.now();
+
+  // Power Expiry Checks
+  if (isFreezeActive && now >= freezeEndTime) {
+    isFreezeActive = false;
+  }
+  if (isFrenzyActive && now >= frenzyEndTime) {
+    isFrenzyActive = false;
+  }
+
+  // Freeze time scale multiplier (0.28 = slow-mo, 1.0 = normal)
+  const timeScale = isFreezeActive ? 0.28 : 1.0;
+
+  // Frenzy Continuous Rapid Spawning
+  if (isFrenzyActive && gameState === 'PLAYING' && now - lastFrenzySpawn > 320) {
+    lastFrenzySpawn = now;
+    spawnFruit(true);
+  }
+
+  // Ambient Power Particles
+  if (isFreezeActive && Math.random() < 0.25) {
+    particles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height * 0.4,
+      vx: (Math.random() - 0.5) * 1.5,
+      vy: Math.random() * 2 + 0.5,
+      color: '#e0f8ff',
+      radius: Math.random() * 3 + 1.5,
+      opacity: 0.9,
+      decay: 0.015
+    });
+  }
+
+  if (isFrenzyActive && Math.random() < 0.35) {
+    particles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 6,
+      vy: (Math.random() - 0.5) * 6,
+      color: Math.random() < 0.6 ? '#ffd700' : '#ffffff',
+      radius: Math.random() * 3 + 1,
+      opacity: 1,
+      decay: 0.04
+    });
+  }
+
   // 1. Update fruits position & gravitation
   for (let i = fruits.length - 1; i >= 0; i--) {
     const f = fruits[i];
-    f.x += f.vx;
-    f.vy += baseGravity;
-    f.y += f.vy;
-    f.angle += f.rotationSpeed;
+    f.x += f.vx * timeScale;
+    f.vy += baseGravity * timeScale;
+    f.y += f.vy * timeScale;
+    f.angle += f.rotationSpeed * timeScale;
 
     // Drop below screen: penalize life in classic mode
     if (f.y > canvas.height + f.radius && f.vy > 0) {
@@ -1334,10 +1468,10 @@ function updatePhysics() {
   // 2. Update sliced fruit halves
   for (let i = slicedFruits.length - 1; i >= 0; i--) {
     const sf = slicedFruits[i];
-    sf.x += sf.vx;
-    sf.vy += baseGravity;
-    sf.y += sf.vy;
-    sf.angle += sf.rotationSpeed;
+    sf.x += sf.vx * timeScale;
+    sf.vy += baseGravity * timeScale;
+    sf.y += sf.vy * timeScale;
+    sf.angle += sf.rotationSpeed * timeScale;
 
     if (sf.y > canvas.height + sf.radius) {
       slicedFruits.splice(i, 1);
@@ -1347,10 +1481,10 @@ function updatePhysics() {
   // 3. Update bombs
   for (let i = bombs.length - 1; i >= 0; i--) {
     const b = bombs[i];
-    b.x += b.vx;
-    b.vy += baseGravity;
-    b.y += b.vy;
-    b.fusePhase += 0.15;
+    b.x += b.vx * timeScale;
+    b.vy += baseGravity * timeScale;
+    b.y += b.vy * timeScale;
+    b.fusePhase += 0.15 * timeScale;
 
     if (b.y > canvas.height + b.radius && b.vy > 0) {
       bombs.splice(i, 1);
@@ -1525,6 +1659,44 @@ function drawScene() {
     ctx.fillText(ft.text, ft.x, ft.y);
     ctx.restore();
   });
+
+  // 9. Draw Devil Fruit Power Screen Vignette Auras & Banner
+  if (isFreezeActive) {
+    const iceGrad = ctx.createRadialGradient(
+      canvas.width / 2, canvas.height / 2, canvas.height * 0.35,
+      canvas.width / 2, canvas.height / 2, canvas.width * 0.75
+    );
+    iceGrad.addColorStop(0, 'rgba(0, 229, 255, 0)');
+    iceGrad.addColorStop(1, 'rgba(0, 229, 255, 0.28)');
+    ctx.fillStyle = iceGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  if (isFrenzyActive) {
+    const frenzyGrad = ctx.createRadialGradient(
+      canvas.width / 2, canvas.height / 2, canvas.height * 0.35,
+      canvas.width / 2, canvas.height / 2, canvas.width * 0.75
+    );
+    frenzyGrad.addColorStop(0, 'rgba(255, 215, 0, 0)');
+    frenzyGrad.addColorStop(1, 'rgba(255, 215, 0, 0.28)');
+    ctx.fillStyle = frenzyGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  if (powerBanner && Date.now() < powerBanner.expires) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = '900 36px "Outfit", sans-serif';
+    ctx.fillStyle = powerBanner.color;
+    ctx.shadowColor = powerBanner.color;
+    ctx.shadowBlur = 20;
+    ctx.fillText(powerBanner.title, canvas.width / 2, 70);
+    ctx.font = '800 20px "Outfit", sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowBlur = 10;
+    ctx.fillText(powerBanner.subtitle, canvas.width / 2, 104);
+    ctx.restore();
+  }
 
   ctx.restore();
 }
@@ -1776,6 +1948,115 @@ function drawFruitModel(ctx, fruit, isSliced) {
       ctx.lineTo(fruit.radius * 0.3, -fruit.radius * 1.05);
       ctx.closePath();
       ctx.fill();
+      break;
+
+    case 'ice_fruit':
+      // Ice Fruit: Cyan Crystalline Sphere with Devil Fruit Spirals
+      ctx.save();
+      ctx.shadowColor = '#00f0ff';
+      ctx.shadowBlur = 20;
+
+      // Base Ice Shell
+      ctx.fillStyle = fruit.skinColor;
+      ctx.beginPath();
+      ctx.arc(0, 0, fruit.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Inner Frost Core
+      ctx.fillStyle = fruit.fleshColor;
+      ctx.beginPath();
+      ctx.arc(0, 0, fruit.radius * 0.85, 0, Math.PI * 2);
+      ctx.fill();
+
+      // One Piece Devil Fruit Signature Spiral Swirls
+      ctx.strokeStyle = '#0284c7';
+      ctx.lineWidth = 2.5;
+      const iceSwirls = [
+        { x: -14, y: -12 }, { x: 14, y: -12 },
+        { x: 0, y: 8 }, { x: -16, y: 16 }, { x: 16, y: 16 }
+      ];
+      iceSwirls.forEach(s => {
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 7, 0, Math.PI * 1.5);
+        ctx.stroke();
+      });
+
+      // Ice Crystal Facets
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-fruit.radius * 0.6, -fruit.radius * 0.3);
+      ctx.lineTo(0, -fruit.radius * 0.8);
+      ctx.lineTo(fruit.radius * 0.6, -fruit.radius * 0.3);
+      ctx.lineTo(0, fruit.radius * 0.7);
+      ctx.closePath();
+      ctx.stroke();
+
+      // Icy Crown Stem (top)
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.moveTo(-8, -fruit.radius * 0.9);
+      ctx.lineTo(-4, -fruit.radius * 1.35);
+      ctx.lineTo(0, -fruit.radius * 1.15);
+      ctx.lineTo(4, -fruit.radius * 1.35);
+      ctx.lineTo(8, -fruit.radius * 0.9);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      break;
+
+    case 'lightning_fruit':
+      // Lightning Fruit: Electric Golden Sphere with Lightning Bolts & Spirals
+      ctx.save();
+      ctx.shadowColor = '#ffd700';
+      ctx.shadowBlur = 22;
+
+      // Base Golden Electric Shell
+      ctx.fillStyle = fruit.skinColor;
+      ctx.beginPath();
+      ctx.arc(0, 0, fruit.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Inner Core
+      ctx.fillStyle = fruit.fleshColor;
+      ctx.beginPath();
+      ctx.arc(0, 0, fruit.radius * 0.86, 0, Math.PI * 2);
+      ctx.fill();
+
+      // One Piece Devil Fruit Signature Spiral Swirls
+      ctx.strokeStyle = '#d97706';
+      ctx.lineWidth = 2.5;
+      const lSwirls = [
+        { x: -14, y: -10 }, { x: 14, y: -10 },
+        { x: 0, y: 12 }, { x: -14, y: 18 }, { x: 14, y: 18 }
+      ];
+      lSwirls.forEach(s => {
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 7, 0, Math.PI * 1.6);
+        ctx.stroke();
+      });
+
+      // Zig-zag Lightning Bolt across face
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-6, -fruit.radius * 0.6);
+      ctx.lineTo(10, -4);
+      ctx.lineTo(-4, 2);
+      ctx.lineTo(8, fruit.radius * 0.65);
+      ctx.stroke();
+
+      // Lightning Bolt Stem (top)
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.moveTo(-6, -fruit.radius * 0.9);
+      ctx.lineTo(4, -fruit.radius * 1.4);
+      ctx.lineTo(-2, -fruit.radius * 1.2);
+      ctx.lineTo(6, -fruit.radius * 1.5);
+      ctx.lineTo(8, -fruit.radius * 0.9);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
       break;
   }
 

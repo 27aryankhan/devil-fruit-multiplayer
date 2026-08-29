@@ -350,6 +350,70 @@ class GameAudio {
     });
   }
 
+  playFreeze() {
+    if (this.muted || !this.ctx) return;
+    this.resumeContext();
+    const now = this.ctx.currentTime;
+    
+    // Shimmering ice crystal tones (E6 -> G6 -> B6 -> E7)
+    const freqs = [1318.51, 1567.98, 1975.53, 2637.02];
+    freqs.forEach((freq, idx) => {
+      const startTime = now + idx * 0.07;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, startTime);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.5, startTime + 0.35);
+      
+      gain.gain.setValueAtTime(0.18, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.5);
+      
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      
+      osc.start(startTime);
+      osc.stop(startTime + 0.55);
+    });
+  }
+
+  playLightning() {
+    if (this.muted || !this.ctx) return;
+    this.resumeContext();
+    const now = this.ctx.currentTime;
+    
+    // Electric Sawtooth Burst
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(800, now);
+    osc.frequency.exponentialRampToValueAtTime(80, now + 0.25);
+    
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    
+    osc.start(now);
+    osc.stop(now + 0.32);
+
+    // Thunder boom bass
+    const bass = this.ctx.createOscillator();
+    const bassGain = this.ctx.createGain();
+    bass.type = 'triangle';
+    bass.frequency.setValueAtTime(140, now);
+    bass.frequency.exponentialRampToValueAtTime(30, now + 0.6);
+    bassGain.gain.setValueAtTime(0.35, now);
+    bassGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+    
+    bass.connect(bassGain);
+    bassGain.connect(this.ctx.destination);
+    bass.start(now);
+    bass.stop(now + 0.65);
+  }
+
   stopMusic() {
     this.musicPlaying = false;
     if (this.musicInterval) {
