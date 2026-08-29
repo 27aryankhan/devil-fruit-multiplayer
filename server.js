@@ -314,7 +314,8 @@ const server = http.createServer((req, res) => {
   // Apply security headers to every response
   setSecurityHeaders(res);
 
-  let filePath = req.url === '/' ? '/index.html' : req.url;
+  const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  let filePath = parsedUrl.pathname === '/' ? '/index.html' : parsedUrl.pathname;
   
   // Health check / ping endpoint for keep-alive monitoring (e.g. UptimeRobot / cron-job.org)
   if (filePath === '/health' || filePath === '/ping') {
@@ -552,7 +553,10 @@ const server = http.createServer((req, res) => {
 
         const ext = path.extname(resolvedPath).toLowerCase();
         const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-        res.writeHead(200, { 'Content-Type': contentType });
+        res.writeHead(200, {
+          'Content-Type': contentType,
+          'Cache-Control': ext === '.html' ? 'no-cache, no-store, must-revalidate' : 'public, max-age=86400'
+        });
         res.end(data);
       });
     });
