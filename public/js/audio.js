@@ -94,6 +94,57 @@ class GameAudio {
     }
   }
 
+  playHeavySlash() {
+    if (this.muted || !this.ctx) return;
+    this.resumeContext();
+    const now = this.ctx.currentTime;
+
+    // Deep blade resonance whoosh
+    const osc = this.ctx.createOscillator();
+    const oscGain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(650, now);
+    osc.frequency.exponentialRampToValueAtTime(45, now + 0.35);
+    oscGain.gain.setValueAtTime(0.32, now);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    osc.connect(oscGain);
+    oscGain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.36);
+
+    // High frequency metallic blade slice
+    const metal = this.ctx.createOscillator();
+    const metalGain = this.ctx.createGain();
+    metal.type = 'triangle';
+    metal.frequency.setValueAtTime(2400, now);
+    metal.frequency.exponentialRampToValueAtTime(800, now + 0.22);
+    metalGain.gain.setValueAtTime(0.2, now);
+    metalGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+    metal.connect(metalGain);
+    metalGain.connect(this.ctx.destination);
+    metal.start(now);
+    metal.stop(now + 0.24);
+
+    // Noise rush
+    if (this.noiseBuffer) {
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this.noiseBuffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1600, now);
+      filter.frequency.exponentialRampToValueAtTime(200, now + 0.3);
+      filter.Q.setValueAtTime(3, now);
+      const nGain = this.ctx.createGain();
+      nGain.gain.setValueAtTime(0.25, now);
+      nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      noise.connect(filter);
+      filter.connect(nGain);
+      nGain.connect(this.ctx.destination);
+      noise.start(now);
+      noise.stop(now + 0.32);
+    }
+  }
+
   playSplat() {
     if (this.muted || !this.ctx) return;
     this.resumeContext();

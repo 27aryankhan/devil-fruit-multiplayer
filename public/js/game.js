@@ -262,6 +262,10 @@ let frenzyEndTime = 0;
 let lastFrenzySpawn = 0;
 let powerBanner = null; // { title, subtitle, color, expires }
 
+// --- AMBIENCE & CINEMATIC TRANSITIONS ---
+let sakuraPetals = [];
+let isTransitioning = false;
+
 // --- INITIALIZATION ---
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -807,7 +811,45 @@ function toggleAudio() {
   }
 }
 
-function startGame() {
+function triggerKatanaSlash(onComplete) {
+  if (isTransitioning) return;
+  isTransitioning = true;
+
+  const overlay = document.getElementById('katana-slash-overlay');
+  const lobbyCard = document.querySelector('.lobby-card');
+  const lbCard = document.querySelector('.leaderboard-card');
+
+  if (overlay) {
+    overlay.classList.remove('active');
+    void overlay.offsetWidth; // force browser layout recalculation
+    overlay.classList.add('active');
+  }
+
+  if (lobbyCard) lobbyCard.classList.add('screen-slice-top');
+  if (lbCard) lbCard.classList.add('screen-slice-bottom');
+
+  audio.playHeavySlash();
+
+  setTimeout(() => {
+    if (overlay) overlay.classList.remove('active');
+    if (lobbyCard) lobbyCard.classList.remove('screen-slice-top');
+    if (lbCard) lbCard.classList.remove('screen-slice-bottom');
+    isTransitioning = false;
+    if (onComplete) onComplete();
+  }, 420);
+}
+
+function startGame(skipTransition = false) {
+  if (gameState === 'PLAYING' || isTransitioning) return;
+
+  if (!skipTransition && gameState === 'LOBBY') {
+    triggerKatanaSlash(() => proceedStartGame());
+    return;
+  }
+  proceedStartGame();
+}
+
+function proceedStartGame() {
   gameState = 'PLAYING';
   score = 0;
   lives = 3;
@@ -1540,6 +1582,11 @@ function updatePhysics() {
     if (screenShake < 0.5) screenShake = 0;
   }
 
+  // Ambient Sakura Petal update for Dojo Ambiance
+  if (gameState === 'LOBBY' || gameState === 'GAMEOVER') {
+    updateSakuraPetals();
+  }
+
   // 8. Per-frame proximity check: catch fruits that fly INTO an active swipe path
   // between network messages. Only checks active pointers (finger currently down),
   // using a simple point-to-circle distance — very lightweight.
@@ -1564,6 +1611,11 @@ function drawScene() {
 
   // Clear Canvas (background is custom radial gradient via style.css)
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw Ambient Floating Sakura Petals in Lobby & Dojo
+  if (gameState === 'LOBBY' || gameState === 'GAMEOVER') {
+    drawSakuraPetals(ctx);
+  }
 
   // 1. Draw static background splats
   backgroundSplats.forEach(splat => {
@@ -2141,10 +2193,12 @@ function drawBombModel(ctx, bomb) {
   ctx.restore();
 }
 
-// --- AMBIENT FLOATING FRUITS FOR LOBBY BACKGROUND ---
+// --- AMBIENT FLOATING FRUITS & SAKURA AMBIANCE FOR LOBBY BACKGROUND ---
 
 let lobbyInterval = null;
 function startLobbyAnimations() {
+  initSakuraPetals();
+
   // Spawn ambient floating fruits behind the lobby card
   lobbyInterval = setInterval(() => {
     if (gameState !== 'LOBBY') {
@@ -2167,4 +2221,65 @@ function startLobbyAnimations() {
       });
     }
   }, 2500);
+}
+
+// Sakura Petal Particle System
+function initSakuraPetals() {
+  sakuraPetals = [];
+  const count = 35;
+  const w = canvas ? canvas.width : window.innerWidth;
+  const h = canvas ? canvas.height : window.innerHeight;
+
+  for (let i = 0; i < count; i++) {
+    sakuraPetals.push({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      size: Math.random() * 8 + 6,
+      vx: Math.random() * 1.2 + 0.5,
+      vy: Math.random() * 1.2 + 0.8,
+      angle: Math.random() * Math.PI * 2,
+      rotationSpeed: (Math.random() - 0.5) * 0.04,
+      swayPhase: Math.random() * Math.PI * 2,
+      swaySpeed: Math.random() * 0.025 + 0.015,
+      opacity: Math.random() * 0.35 + 0.3,
+      color: Math.random() < 0.65 ? '#f472b6' : '#fda4af'
+    });
+  }
+}
+
+function updateSakuraPetals() {
+  if (!canvas) return;
+  sakuraPetals.forEach(p => {
+    p.swayPhase += p.swaySpeed;
+    p.x += p.vx + Math.sin(p.swayPhase) * 1.1;
+    p.y += p.vy;
+    p.angle += p.rotationSpeed;
+
+    if (p.y > canvas.height + 25) {
+      p.y = -25;
+      p.x = Math.random() * canvas.width;
+    }
+    if (p.x > canvas.width + 25) {
+      p.x = -25;
+    }
+  });
+}
+
+function drawSakuraPetals(ctx) {
+  sakuraPetals.forEach(p => {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.angle);
+    ctx.globalAlpha = p.opacity;
+    ctx.fillStyle = p.color;
+
+    // Draw stylized curved sakura petal geometry
+    ctx.beginPath();
+    ctx.moveTo(0, -p.size);
+    ctx.bezierCurveTo(p.size * 0.8, -p.size * 0.6, p.size * 0.8, p.size * 0.6, 0, p.size);
+    ctx.bezierCurveTo(-p.size * 0.8, p.size * 0.6, -p.size * 0.8, -p.size * 0.6, 0, -p.size);
+    ctx.fill();
+
+    ctx.restore();
+  });
 }

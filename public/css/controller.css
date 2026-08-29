@@ -18,7 +18,7 @@ body {
   overflow: hidden;
 }
 
-/* Fullscreen Touch pad */
+/* Fullscreen Touch pad with Katana Blade Theme */
 #touch-pad {
   position: absolute;
   top: 0;
@@ -26,13 +26,38 @@ body {
   width: 100%;
   height: 100%;
   z-index: 1;
-  background: radial-gradient(circle at center, #0f1217 0%, #000000 100%);
+  background: radial-gradient(circle at center, #151a24 0%, #080a0f 100%);
   transition: box-shadow 0.5s ease;
+  overflow: hidden;
+}
+
+/* Katana Watermark & Blade Alignment Guide */
+#touch-pad::before {
+  content: '⚔️';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 8rem;
+  opacity: 0.05;
+  pointer-events: none;
+  filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.2));
+}
+
+#touch-pad::after {
+  content: '';
+  position: absolute;
+  top: 15%;
+  bottom: 15%;
+  left: 50%;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.08), transparent);
+  pointer-events: none;
 }
 
 /* Pulsing Player Glow Borders */
 #touch-pad.player-active {
-  box-shadow: inset 0 0 40px currentColor;
+  box-shadow: inset 0 0 45px currentColor;
 }
 
 /* Overlays */
@@ -381,20 +406,25 @@ body {
   border-radius: 20px;
 }
 
-/* Tap ripple effect on touchpad */
+/* Tap & Swipe Blade Spark effect on touchpad */
 .ripple {
   position: absolute;
   border-radius: 50%;
   pointer-events: none;
-  background: radial-gradient(circle, transparent 40%, currentColor 100%);
-  opacity: 0.6;
-  transform: scale(0);
-  animation: rippleAnimation 0.4s ease-out forwards;
+  background: radial-gradient(circle, #ffffff 15%, currentColor 70%, transparent 100%);
+  box-shadow: 0 0 16px currentColor;
+  opacity: 0.9;
+  transform: scale(0.3);
+  animation: rippleAnimation 0.35s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
 }
 
 @keyframes rippleAnimation {
-  to {
-    transform: scale(3.5);
+  0% {
+    transform: scale(0.3);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(2.8);
     opacity: 0;
   }
 }
