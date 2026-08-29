@@ -213,6 +213,8 @@ function connectWebSocket() {
         country: playerCountry
       }));
     }
+
+    startHeartbeat();
   };
 
   socket.onmessage = (event) => {
@@ -235,6 +237,10 @@ function connectWebSocket() {
         case 'gameSync':
           handleGameSync(data);
           break;
+
+        case 'pong':
+          // Heartbeat keep-alive response
+          break;
           
         case 'vibrate':
           if (navigator.vibrate) {
@@ -254,6 +260,7 @@ function connectWebSocket() {
 
   socket.onclose = () => {
     console.warn('Socket closed. Scheduling reconnect...');
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
     if (!isRegistered) {
       updateStatus('error', 'Lost connection to Dojo. Reconnecting...');
       if (joinBtn) joinBtn.disabled = true;
@@ -266,6 +273,30 @@ function connectWebSocket() {
     updateStatus('error', 'Connection failed. Reconnecting...');
   };
 }
+
+let heartbeatInterval = null;
+function startHeartbeat() {
+  if (heartbeatInterval) clearInterval(heartbeatInterval);
+  heartbeatInterval = setInterval(() => {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: 'ping' }));
+    }
+  }, 15000);
+}
+
+// Reconnect instantly when returning from phone lock or background tab
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      connectWebSocket();
+    }
+  }
+});
+window.addEventListener('focus', () => {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    connectWebSocket();
+  }
+});
 
 function scheduleReconnect() {
   if (reconnectTimer) return;

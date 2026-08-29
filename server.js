@@ -758,6 +758,12 @@ wss.on('connection', (ws, req) => {
           });
           break;
 
+        case 'ping':
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'pong' }));
+          }
+          break;
+
         case 'triggerVibrate': {
           // Screen requests vibration for a specific player
           const targetPlayerId = data.playerId;

@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0d0f12">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Devil Fruits - Multi-Device Experience</title>
   <link rel="icon" href="/favicon.png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -84,21 +87,21 @@
         <div class="controls-section">
           <div class="mode-select">
             <button class="mode-btn active" id="btn-classic" onclick="setMode('classic')">
-              <strong>Classic Mode</strong>
+              <strong>Classic Mode <span class="kbd-hint">C</span></strong>
               <span>3 Lives • Bombs • High Stakes</span>
             </button>
             <button class="mode-btn" id="btn-zen" onclick="setMode('zen')">
-              <strong>Zen Mode</strong>
+              <strong>Zen Mode <span class="kbd-hint">Z</span></strong>
               <span>90 Seconds • No Bombs • Relaxed Slicing</span>
             </button>
           </div>
 
           <div class="action-row">
             <button class="action-btn unmute-btn" id="btn-audio" onclick="toggleAudio()">
-              <span class="audio-icon">🔇</span> Enable Sounds
+              <span class="audio-icon">🔇</span> Enable Sounds <span class="kbd-hint">M</span>
             </button>
-            <button class="action-btn start-btn" id="btn-start" onclick="startGame()" disabled>
-              Enter the Dojo (Connect Phone)
+            <button class="action-btn start-btn" id="btn-start" onclick="startGame()">
+              ⚔️ Play / Enter Dojo <span class="kbd-hint">Space</span>
             </button>
           </div>
         </div>

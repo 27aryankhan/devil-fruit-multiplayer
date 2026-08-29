@@ -345,13 +345,98 @@ window.addEventListener('DOMContentLoaded', () => {
   tryConnect();
   fetchLeaderboard('classic');
 
+  // Setup Desktop Mouse & Trackpad Slicing Fallback
+  setupDesktopMouseControls();
+
+  // Setup Keyboard Shortcuts (<Space>, M, C, Z, Esc)
+  setupKeyboardControls();
+
+  // Handle Tab Focus & Visibility Change (resume AudioContext & reconnect WS)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      audio.resumeContext();
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        initWebSocket();
+      }
+    }
+  });
+
   // Start Animation Loop
   requestAnimationFrame(gameLoop);
 });
 
 function resizeCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
+  canvas.style.width = `${window.innerWidth}px`;
+  canvas.style.height = `${window.innerHeight}px`;
+  ctx.resetTransform?.();
+  ctx.scale(dpr, dpr);
+}
+
+// --- DESKTOP MOUSE / TRACKPAD SLICING FALLBACK ---
+let isMouseDown = false;
+function setupDesktopMouseControls() {
+  if (!canvas) return;
+
+  const getCanvasCoords = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) / rect.width,
+      y: (e.clientY - rect.top) / rect.height
+    };
+  };
+
+  canvas.addEventListener('mousedown', (e) => {
+    isMouseDown = true;
+    const coords = getCanvasCoords(e);
+    const pId = 'desktop_host';
+    if (!players[pId]) {
+      registerPlayer(pId, '#ff3366', 'Host Player (Mouse)', '⚔️');
+    }
+    handleTouchStart({ playerId: pId, color: players[pId].color, x: coords.x, y: coords.y });
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isMouseDown) return;
+    const coords = getCanvasCoords(e);
+    const pId = 'desktop_host';
+    handleTouchMove({ playerId: pId, color: players[pId]?.color || '#ff3366', x: coords.x, y: coords.y });
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (!isMouseDown) return;
+    isMouseDown = false;
+    handleTouchEnd({ playerId: 'desktop_host' });
+  });
+}
+
+// --- ACCESSIBILITY & KEYBOARD SHORTCUTS ---
+function setupKeyboardControls() {
+  window.addEventListener('keydown', (e) => {
+    // Avoid interfering with typing in inputs
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+    if (e.code === 'Space' || e.code === 'Enter') {
+      e.preventDefault();
+      if (gameState === 'LOBBY') {
+        startGame();
+      } else if (gameState === 'GAMEOVER') {
+        restartGame();
+      }
+    } else if (e.code === 'KeyM') {
+      toggleAudio();
+    } else if (e.code === 'KeyC') {
+      setMode('classic');
+    } else if (e.code === 'KeyZ') {
+      setMode('zen');
+    } else if (e.code === 'Escape') {
+      if (gameState === 'GAMEOVER') {
+        returnToLobby();
+      }
+    }
+  });
 }
 
 // --- WEBSOCKET CLIENT ---
@@ -1425,16 +1510,20 @@ function triggerBombExplosion(bomb, playerId) {
 
 function gameLoop(timestamp) {
   if (lastTime === 0) lastTime = timestamp;
-  const elapsed = timestamp - lastTime;
+  const elapsed = Math.min(timestamp - lastTime, 100); // Clamp large delta pauses
   lastTime = timestamp;
 
-  updatePhysics();
+  // 60fps base target: dt = 1.0 at 60fps (16.667ms)
+  // Normalizes 120Hz ProMotion (Safari/iOS), 144Hz, 240Hz, and 60Hz screens to 1:1 identical speed!
+  const dt = Math.max(0.2, Math.min(elapsed / 16.667, 3.0));
+
+  updatePhysics(dt);
   drawScene();
 
   requestAnimationFrame(gameLoop);
 }
 
-function updatePhysics() {
+function updatePhysics(dt = 1.0) {
   const now = Date.now();
 
   // Power Expiry Checks
@@ -1447,6 +1536,7 @@ function updatePhysics() {
 
   // Freeze time scale multiplier (0.28 = slow-mo, 1.0 = normal)
   const timeScale = isFreezeActive ? 0.28 : 1.0;
+  const effDt = dt * timeScale;
 
   // Frenzy Continuous Rapid Spawning
   if (isFrenzyActive && gameState === 'PLAYING' && now - lastFrenzySpawn > 320) {
@@ -1455,7 +1545,7 @@ function updatePhysics() {
   }
 
   // Ambient Power Particles
-  if (isFreezeActive && Math.random() < 0.25) {
+  if (isFreezeActive && Math.random() < 0.25 * dt) {
     particles.push({
       x: Math.random() * canvas.width,
       y: Math.random() * canvas.height * 0.4,
@@ -1468,7 +1558,7 @@ function updatePhysics() {
     });
   }
 
-  if (isFrenzyActive && Math.random() < 0.35) {
+  if (isFrenzyActive && Math.random() < 0.35 * dt) {
     particles.push({
       x: Math.random() * canvas.width,
       y: Math.random() * canvas.height,
@@ -1481,13 +1571,13 @@ function updatePhysics() {
     });
   }
 
-  // 1. Update fruits position & gravitation
+  // 1. Update fruits position & gravitation (Scaled with effDt)
   for (let i = fruits.length - 1; i >= 0; i--) {
     const f = fruits[i];
-    f.x += f.vx * timeScale;
-    f.vy += baseGravity * timeScale;
-    f.y += f.vy * timeScale;
-    f.angle += f.rotationSpeed * timeScale;
+    f.x += f.vx * effDt;
+    f.vy += baseGravity * effDt;
+    f.y += f.vy * effDt;
+    f.angle += f.rotationSpeed * effDt;
 
     // Drop below screen: penalize life in classic mode
     if (f.y > canvas.height + f.radius && f.vy > 0) {
@@ -1510,10 +1600,10 @@ function updatePhysics() {
   // 2. Update sliced fruit halves
   for (let i = slicedFruits.length - 1; i >= 0; i--) {
     const sf = slicedFruits[i];
-    sf.x += sf.vx * timeScale;
-    sf.vy += baseGravity * timeScale;
-    sf.y += sf.vy * timeScale;
-    sf.angle += sf.rotationSpeed * timeScale;
+    sf.x += sf.vx * effDt;
+    sf.vy += baseGravity * effDt;
+    sf.y += sf.vy * effDt;
+    sf.angle += sf.rotationSpeed * effDt;
 
     if (sf.y > canvas.height + sf.radius) {
       slicedFruits.splice(i, 1);
@@ -1523,10 +1613,10 @@ function updatePhysics() {
   // 3. Update bombs
   for (let i = bombs.length - 1; i >= 0; i--) {
     const b = bombs[i];
-    b.x += b.vx * timeScale;
-    b.vy += baseGravity * timeScale;
-    b.y += b.vy * timeScale;
-    b.fusePhase += 0.15 * timeScale;
+    b.x += b.vx * effDt;
+    b.vy += baseGravity * effDt;
+    b.y += b.vy * effDt;
+    b.fusePhase += 0.15 * effDt;
 
     if (b.y > canvas.height + b.radius && b.vy > 0) {
       bombs.splice(i, 1);
@@ -1536,9 +1626,9 @@ function updatePhysics() {
   // 4. Update particles
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
-    p.x += p.vx;
-    p.y += p.vy;
-    p.opacity -= p.decay;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.opacity -= p.decay * dt;
 
     if (p.opacity <= 0) {
       particles.splice(i, 1);
@@ -1548,8 +1638,8 @@ function updatePhysics() {
   // 5. Update floating score labels
   for (let i = floatingTexts.length - 1; i >= 0; i--) {
     const ft = floatingTexts[i];
-    ft.y += ft.vy;
-    ft.opacity -= 0.015;
+    ft.y += ft.vy * dt;
+    ft.opacity -= 0.015 * dt;
 
     if (ft.opacity <= 0) {
       floatingTexts.splice(i, 1);
@@ -1559,7 +1649,7 @@ function updatePhysics() {
   // 6. Slowly age background splats
   for (let i = backgroundSplats.length - 1; i >= 0; i--) {
     const splat = backgroundSplats[i];
-    splat.opacity -= 0.0003; // very slow fade
+    splat.opacity -= 0.0003 * dt;
     if (splat.opacity <= 0) {
       backgroundSplats.splice(i, 1);
     }
@@ -1569,7 +1659,7 @@ function updatePhysics() {
   Object.keys(swipeTrails).forEach(pId => {
     const trail = swipeTrails[pId];
     for (let i = trail.length - 1; i >= 0; i--) {
-      trail[i].age += 1;
+      trail[i].age += 1 * dt;
       if (trail[i].age > 10) {
         trail.splice(i, 1);
       }
@@ -1578,13 +1668,13 @@ function updatePhysics() {
 
   // Apply screen shake decay
   if (screenShake > 0) {
-    screenShake *= 0.9;
+    screenShake *= Math.pow(0.9, dt);
     if (screenShake < 0.5) screenShake = 0;
   }
 
   // Ambient Sakura Petal update for Dojo Ambiance
   if (gameState === 'LOBBY' || gameState === 'GAMEOVER') {
-    updateSakuraPetals();
+    updateSakuraPetals(dt);
   }
 
   // 8. Per-frame proximity check: catch fruits that fly INTO an active swipe path
@@ -2247,13 +2337,13 @@ function initSakuraPetals() {
   }
 }
 
-function updateSakuraPetals() {
+function updateSakuraPetals(dt = 1.0) {
   if (!canvas) return;
   sakuraPetals.forEach(p => {
-    p.swayPhase += p.swaySpeed;
-    p.x += p.vx + Math.sin(p.swayPhase) * 1.1;
-    p.y += p.vy;
-    p.angle += p.rotationSpeed;
+    p.swayPhase += p.swaySpeed * dt;
+    p.x += (p.vx + Math.sin(p.swayPhase) * 1.1) * dt;
+    p.y += p.vy * dt;
+    p.angle += p.rotationSpeed * dt;
 
     if (p.y > canvas.height + 25) {
       p.y = -25;

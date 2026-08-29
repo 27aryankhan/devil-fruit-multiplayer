@@ -5,6 +5,20 @@ class GameAudio {
     this.noiseBuffer = null;
     this.musicPlaying = false;
     this.musicInterval = null;
+    this.enableUniversalGestureUnlock();
+  }
+
+  enableUniversalGestureUnlock() {
+    const unlock = () => {
+      this.init();
+      this.resumeContext();
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('touchstart', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('touchstart', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
   }
 
   init() {
@@ -15,7 +29,6 @@ class GameAudio {
     if (AudioContextClass) {
       this.ctx = new AudioContextClass();
       this.noiseBuffer = this.createNoiseBuffer();
-      this.muted = false;
     }
   }
 
