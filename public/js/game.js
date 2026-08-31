@@ -345,9 +345,6 @@ window.addEventListener('DOMContentLoaded', () => {
   tryConnect();
   fetchLeaderboard('classic');
 
-  // Setup Desktop Mouse & Trackpad Slicing Fallback
-  setupDesktopMouseControls();
-
   // Setup Keyboard Shortcuts (<Space>, M, C, Z, Esc)
   setupKeyboardControls();
 
@@ -370,43 +367,6 @@ function resizeCanvas() {
   canvas.height = window.innerHeight;
   canvas.style.width = `${window.innerWidth}px`;
   canvas.style.height = `${window.innerHeight}px`;
-}
-
-// --- DESKTOP MOUSE / TRACKPAD SLICING FALLBACK ---
-let isMouseDown = false;
-function setupDesktopMouseControls() {
-  if (!canvas) return;
-
-  const getCanvasCoords = (e) => {
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: (e.clientX - rect.left) / rect.width,
-      y: (e.clientY - rect.top) / rect.height
-    };
-  };
-
-  canvas.addEventListener('mousedown', (e) => {
-    isMouseDown = true;
-    const coords = getCanvasCoords(e);
-    const pId = 'desktop_host';
-    if (!players[pId]) {
-      registerPlayer(pId, '#ff3366', 'Host Player (Mouse)', '⚔️');
-    }
-    handleTouchStart({ playerId: pId, color: players[pId].color, x: coords.x, y: coords.y });
-  });
-
-  window.addEventListener('mousemove', (e) => {
-    if (!isMouseDown) return;
-    const coords = getCanvasCoords(e);
-    const pId = 'desktop_host';
-    handleTouchMove({ playerId: pId, color: players[pId]?.color || '#ff3366', x: coords.x, y: coords.y });
-  });
-
-  window.addEventListener('mouseup', () => {
-    if (!isMouseDown) return;
-    isMouseDown = false;
-    handleTouchEnd({ playerId: 'desktop_host' });
-  });
 }
 
 // --- ACCESSIBILITY & KEYBOARD SHORTCUTS ---
