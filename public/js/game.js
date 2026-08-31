@@ -484,6 +484,9 @@ function initWebSocket(hostIp) {
             startGame();
           }
           break;
+        case 'returnToLobby':
+          returnToLobby();
+          break;
         case 'leaderboardUpdate':
           if (data.mode === currentLeaderboardMode) {
             renderLeaderboard(data.leaderboard, data.stats);

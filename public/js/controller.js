@@ -466,6 +466,20 @@ function requestPlayAgain() {
   }
 }
 
+// --- GO BACK TO LOBBY / SETUP ---
+function requestGoBack() {
+  vibrateTap();
+  if (gameOverOverlay) gameOverOverlay.classList.add('hidden');
+  if (hudContainer) hudContainer.classList.add('hidden');
+  if (overlaySetup) overlaySetup.classList.remove('hidden');
+
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: 'returnToLobby'
+    }));
+  }
+}
+
 // --- REAL-TIME SCORE & TIMER SYNC ---
 function handleGameSync(data) {
   if (!isRegistered) return;

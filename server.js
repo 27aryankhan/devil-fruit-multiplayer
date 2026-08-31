@@ -741,6 +741,15 @@ wss.on('connection', (ws, req) => {
           }
           break;
 
+        case 'returnToLobby':
+          // Forward return to lobby request to screen
+          if (activeScreen && activeScreen.readyState === WebSocket.OPEN) {
+            activeScreen.send(JSON.stringify({
+              type: 'returnToLobby'
+            }));
+          }
+          break;
+
         case 'gameSync':
           // The screen sends state updates (score, lives, etc.) to sync with all controllers
           controllers.forEach((slot, controllerWs) => {
