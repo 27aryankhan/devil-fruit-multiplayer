@@ -37,7 +37,7 @@ function isValidSpeed(val) {
 // ============================================================
 
 const RATE_LIMIT_WINDOW_MS = 1000; // 1 second window
-const RATE_LIMIT_MAX_MESSAGES = 100; // max messages per window
+const RATE_LIMIT_MAX_MESSAGES = 500; // max messages per window (supports 120Hz/90Hz multi-touch streaming)
 
 function createRateLimiter() {
   return {

@@ -366,13 +366,10 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 function resizeCanvas() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = window.innerWidth * dpr;
-  canvas.height = window.innerHeight * dpr;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
   canvas.style.width = `${window.innerWidth}px`;
   canvas.style.height = `${window.innerHeight}px`;
-  ctx.resetTransform?.();
-  ctx.scale(dpr, dpr);
 }
 
 // --- DESKTOP MOUSE / TRACKPAD SLICING FALLBACK ---
@@ -1902,13 +1899,12 @@ function drawFruitModel(ctx, fruit, isSliced) {
   );
   
   if (isSliced) {
-    // Sliced fruits are split down the center axis
-    // Clip drawing to only draw half
+    // Sliced fruits are split cleanly down the center axis
     ctx.beginPath();
     if (fruit.half === 'left') {
-      ctx.rect(-fruit.radius * 1.5, -fruit.radius * 1.5, fruit.radius * 1.5, fruit.radius * 3);
+      ctx.rect(-fruit.radius * 2.5, -fruit.radius * 2.5, fruit.radius * 2.5, fruit.radius * 5);
     } else {
-      ctx.rect(0, -fruit.radius * 1.5, fruit.radius * 1.5, fruit.radius * 3);
+      ctx.rect(0, -fruit.radius * 2.5, fruit.radius * 2.5, fruit.radius * 5);
     }
     ctx.clip();
   }
