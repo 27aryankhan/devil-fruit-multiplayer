@@ -352,10 +352,10 @@ function requestJoin() {
   const nameErrorHint = document.getElementById('name-error-hint');
   const chosenName = nameInput ? nameInput.value.trim() : '';
 
-  // VALIDATION: First & Last Name are compulsory (at least 2 words, >= 2 characters each)
-  const nameParts = chosenName.split(/\s+/).filter(part => part.length > 0);
-  if (nameParts.length < 2 || nameParts[0].length < 2 || nameParts[1].length < 2) {
+  // VALIDATION: Any valid name (at least 2 characters)
+  if (!chosenName || chosenName.length < 2) {
     if (nameErrorHint) {
+      nameErrorHint.innerText = '⚠️ Please enter your name (at least 2 letters)';
       nameErrorHint.style.display = 'block';
     }
     if (nameInput) {
