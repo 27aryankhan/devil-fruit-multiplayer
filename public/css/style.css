@@ -901,20 +901,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   box-shadow: 0 0 14px rgba(255, 204, 0, 0.6) !important;
 }
 
-/* Keyboard Shortcut Hint Badges */
-.kbd-hint {
-  display: inline-block;
-  font-size: 0.68rem;
-  font-family: monospace;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 1px 5px;
-  margin-left: 6px;
-  color: #fbbf24;
-  vertical-align: middle;
-}
-
 /* Reduced Motion Accessibility Mode */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

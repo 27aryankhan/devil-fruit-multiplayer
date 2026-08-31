@@ -46,7 +46,6 @@ const players = {};
 const swipeTrails = {}; // playerId -> array of {x, y, age}
 const activePointers = {}; // playerId -> {x, y, color}
 const playerScores = {}; // playerId -> score
-const playerSlashes = {}; // playerId -> { points: [], color }
 
 // Game lists
 let fruits = [];
@@ -614,9 +613,6 @@ function handleTouchStart(data) {
   activePointers[pId] = { x: canvasX, y: canvasY, color: data.color };
   swipeTrails[pId] = [{ x: canvasX, y: canvasY, age: 0 }];
 
-  // Initialize playerSlashes[pId]
-  playerSlashes[pId] = { points: [{ x: data.x, y: data.y }], color: data.color };
-
   // Reset player combo tracking
   players[pId].activeCombo = [];
   if (players[pId].comboTimer) {
@@ -660,15 +656,6 @@ function handleTouchMove(data) {
 
   activePointers[pId] = { x: canvasX, y: canvasY, color: data.color };
 
-  // Update playerSlashes
-  if (!playerSlashes[pId]) {
-    playerSlashes[pId] = { points: [], color: data.color };
-  }
-  playerSlashes[pId].points.push({ x: data.x, y: data.y });
-  if (playerSlashes[pId].points.length > 24) {
-    playerSlashes[pId].points.shift();
-  }
-
   // Trigger swish audio at intervals during swipe
   if (Math.random() < 0.12) {
     audio.playSwish();
@@ -702,9 +689,6 @@ function handleTouchEnd(data) {
   if (!players[pId]) return;
 
   delete activePointers[pId];
-
-  // Clear slash data — collision was already handled per-segment in handleTouchMove
-  delete playerSlashes[pId];
 
   // Process potential combos after swipe ends
   checkCombo(pId);
@@ -921,7 +905,6 @@ function proceedStartGame() {
   Object.keys(players).forEach(pId => {
     players[pId].score = 0;
     playerScores[pId] = 0;
-    delete playerSlashes[pId];
     players[pId].activeCombo = [];
     maxCombosAchieved[pId] = 0;
     if (players[pId].comboTimer) {

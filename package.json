@@ -4,11 +4,10 @@
   "description": "Full-stack real-time Devil Fruits game using phone as controller",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "node server.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "qrcode": "^1.5.3",
     "ws": "^8.16.0"
   }
 }
