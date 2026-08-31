@@ -693,7 +693,7 @@ function handleTouchMove(data) {
   const prevPoint = trail[trail.length - 1];
 
   trail.push({ x: canvasX, y: canvasY, age: 0 });
-  if (trail.length > 12) trail.shift(); // Keep trail length limited
+  if (trail.length > 24) trail.shift(); // Keep rich long katana blade trail
 
   activePointers[pId] = { x: canvasX, y: canvasY, color: data.color };
 
@@ -702,7 +702,7 @@ function handleTouchMove(data) {
     playerSlashes[pId] = { points: [], color: data.color };
   }
   playerSlashes[pId].points.push({ x: data.x, y: data.y });
-  if (playerSlashes[pId].points.length > 12) {
+  if (playerSlashes[pId].points.length > 24) {
     playerSlashes[pId].points.shift();
   }
 
@@ -784,10 +784,9 @@ function checkCollisions(playerId, p1, p2) {
   const player = players[playerId];
   if (!player) return;
 
-  // BLADE_WIDTH: the swipe blade is not an infinitely thin line — it has physical width.
-  // This is the most important factor for making slicing feel responsive.
-  const BLADE_WIDTH = 25; // pixels of blade thickness added to hit radius
-  const HIT_FORGIVENESS = 1.5; // also scale the fruit's own radius for network latency
+  // BLADE_WIDTH: the swipe blade has physical width and forgiveness
+  const BLADE_WIDTH = 45; // Generous blade thickness added to hit radius
+  const HIT_FORGIVENESS = 1.8; // Scale fruit radius for network latency
 
   // 1. Check fruit collisions
   for (let i = fruits.length - 1; i >= 0; i--) {
@@ -802,7 +801,7 @@ function checkCollisions(playerId, p1, p2) {
   // 2. Check bomb collisions (slightly less forgiving — bombs should be harder to hit accidentally)
   for (let i = bombs.length - 1; i >= 0; i--) {
     const bomb = bombs[i];
-    const effectiveRadius = bomb.radius * 1.2 + BLADE_WIDTH * 0.5;
+    const effectiveRadius = bomb.radius * 1.15 + BLADE_WIDTH * 0.4;
     if (checkLineCircleCollision(p1, p2, bomb, effectiveRadius)) {
       triggerBombExplosion(bomb, playerId);
       bombs.splice(i, 1);
@@ -816,8 +815,8 @@ function checkProximityCollisions(playerId, px, py) {
   const player = players[playerId];
   if (!player) return;
 
-  const BLADE_WIDTH = 25;
-  const PROXIMITY_FORGIVENESS = 1.6;
+  const BLADE_WIDTH = 45;
+  const PROXIMITY_FORGIVENESS = 1.9;
 
   // Check fruits
   for (let i = fruits.length - 1; i >= 0; i--) {
@@ -838,7 +837,7 @@ function checkProximityCollisions(playerId, px, py) {
     const dx = px - bomb.x;
     const dy = py - bomb.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const effectiveRadius = bomb.radius * 1.2 + BLADE_WIDTH * 0.5;
+    const effectiveRadius = bomb.radius * 1.15 + BLADE_WIDTH * 0.4;
     if (dist <= effectiveRadius) {
       triggerBombExplosion(bomb, playerId);
       bombs.splice(i, 1);
@@ -1657,7 +1656,7 @@ function updatePhysics(dt = 1.0) {
     const trail = swipeTrails[pId];
     for (let i = trail.length - 1; i >= 0; i--) {
       trail[i].age += 1 * dt;
-      if (trail[i].age > 10) {
+      if (trail[i].age > 18) {
         trail.splice(i, 1);
       }
     }

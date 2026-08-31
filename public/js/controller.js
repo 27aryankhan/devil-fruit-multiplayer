@@ -38,7 +38,7 @@ let lastX = 0;
 let lastY = 0;
 let lastTime = 0;
 let lastSocketSentTime = 0;
-const THROTTLE_MS = 12; // ~83 updates/sec
+const THROTTLE_MS = 8; // ~125 updates/sec ultra-smooth streaming
 
 // DOM Elements
 const touchPad = document.getElementById('touch-pad');
@@ -542,6 +542,18 @@ async function requestWakeLock() {
 function setupTouchpad() {
   if (!touchPad) return;
 
+  // Helper to map touch coordinates ergonomics
+  const getNormalizedCoords = (clientX, clientY) => {
+    const isPortrait = window.innerHeight > window.innerWidth;
+    const normX = Math.max(0, Math.min(1, clientX / window.innerWidth));
+    // In portrait mode, expand vertical reach so comfortable thumb movement covers the entire screen
+    let normY = isPortrait 
+      ? (clientY / window.innerHeight - 0.08) / 0.78
+      : clientY / window.innerHeight;
+    normY = Math.max(0, Math.min(1, normY));
+    return { x: normX, y: normY };
+  };
+
   // Touch Handlers
   touchPad.addEventListener('touchstart', (e) => {
     e.preventDefault();
@@ -550,15 +562,13 @@ function setupTouchpad() {
 
     isTouching = true;
     const touch = e.touches[0];
-    
-    const x = Math.max(0, Math.min(1, touch.clientX / window.innerWidth));
-    const y = Math.max(0, Math.min(1, touch.clientY / window.innerHeight));
+    const coords = getNormalizedCoords(touch.clientX, touch.clientY);
 
-    lastX = x;
-    lastY = y;
+    lastX = coords.x;
+    lastY = coords.y;
     lastTime = Date.now();
 
-    sendTouchEvent('touchStart', x, y, 0, 0, 0);
+    sendTouchEvent('touchStart', coords.x, coords.y, 0, 0, 0);
     spawnRipple(touch.clientX, touch.clientY);
   }, { passive: false });
 
@@ -567,29 +577,28 @@ function setupTouchpad() {
     if (!isRegistered || !isTouching) return;
 
     const touch = e.touches[0];
-    const x = Math.max(0, Math.min(1, touch.clientX / window.innerWidth));
-    const y = Math.max(0, Math.min(1, touch.clientY / window.innerHeight));
     const now = Date.now();
     
-    // Throttle WebSocket messages for smooth 80-90 fps streaming
+    // Throttle WebSocket messages for smooth 120 fps streaming
     if (now - lastSocketSentTime < THROTTLE_MS) {
       return;
     }
 
+    const coords = getNormalizedCoords(touch.clientX, touch.clientY);
     const dt = (now - lastTime) || 1;
-    const vx = (x - lastX) / dt;
-    const vy = (y - lastY) / dt;
+    const vx = (coords.x - lastX) / dt;
+    const vy = (coords.y - lastY) / dt;
     const speed = Math.sqrt(vx * vx + vy * vy);
 
-    sendTouchEvent('touchMove', x, y, vx, vy, speed);
+    sendTouchEvent('touchMove', coords.x, coords.y, vx, vy, speed);
     
     // Periodically spawn small trail ripples
     if (Math.random() < 0.35) {
       spawnRipple(touch.clientX, touch.clientY, true);
     }
 
-    lastX = x;
-    lastY = y;
+    lastX = coords.x;
+    lastY = coords.y;
     lastTime = now;
     lastSocketSentTime = now;
   }, { passive: false });
