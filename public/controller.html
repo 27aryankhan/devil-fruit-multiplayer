@@ -6,7 +6,7 @@
   <title>Devil Fruits - Controller</title>
   <link rel="icon" href="/favicon.png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/controller.css?v=3.0">
+  <link rel="stylesheet" href="css/controller.css?v=4.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
@@ -144,6 +144,16 @@
       <div class="mode-tag" id="hud-mode">Classic</div>
     </div>
 
+    <!-- Controller Mode Switcher -->
+    <div class="controller-mode-toggle" id="controller-mode-toggle">
+      <button type="button" class="ctrl-mode-btn active" id="btn-mode-touch" onclick="setControllerMode('touch')">
+        👆 Touchpad
+      </button>
+      <button type="button" class="ctrl-mode-btn" id="btn-mode-motion" onclick="setControllerMode('motion')">
+        ⚔️ Motion Katana
+      </button>
+    </div>
+
     <!-- Centered Score / Timer -->
     <div class="hud-center">
       <div class="score-display">
@@ -151,6 +161,42 @@
         <span class="value" id="hud-score">0</span>
       </div>
       <div class="timer-display hidden" id="hud-timer">90s</div>
+    </div>
+
+    <!-- Motion Katana Visualizer (Active only in Motion Mode) -->
+    <div class="motion-katana-panel hidden" id="motion-katana-panel">
+      <!-- iOS Permission Request Banner -->
+      <div class="motion-perm-banner hidden" id="motion-perm-banner">
+        <div class="perm-title">📱 Motion Sensor Access Required</div>
+        <p class="perm-desc">Tap below to allow Safari motion detection for katana swings.</p>
+        <button type="button" class="action-btn perm-btn" id="btn-grant-motion" onclick="requestMotionPermission()">
+          ⚡ ACTIVATE KATANA SENSORS
+        </button>
+      </div>
+
+      <!-- Live Katana Blade & Swing Meter -->
+      <div class="katana-blade-container" id="katana-blade-container">
+        <div class="katana-blade-visual" id="katana-blade-visual">
+          <div class="blade-hilt"></div>
+          <div class="blade-guard"></div>
+          <div class="blade-steel"></div>
+          <div class="blade-aura"></div>
+        </div>
+        <div class="swing-direction-hint" id="swing-direction-hint">Ready! Swing phone in air</div>
+      </div>
+
+      <!-- Power & Sensitivity Controls -->
+      <div class="motion-controls-row">
+        <div class="swing-power-gauge">
+          <span class="gauge-label">SWING POWER</span>
+          <div class="gauge-track">
+            <div class="gauge-fill" id="swing-gauge-fill"></div>
+          </div>
+        </div>
+        <button type="button" class="sensitivity-toggle" id="btn-sensitivity" onclick="toggleSensitivity()">
+          Sensitivity: <span id="sensitivity-val">NORMAL</span>
+        </button>
+      </div>
     </div>
 
     <div class="hud-bottom">
@@ -188,6 +234,6 @@
   </div>
 
   <!-- Load script -->
-  <script src="js/controller.js?v=3.0"></script>
+  <script src="js/controller.js?v=4.0"></script>
 </body>
 </html>

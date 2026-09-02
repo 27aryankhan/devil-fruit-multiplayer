@@ -735,6 +735,27 @@ wss.on('connection', (ws, req) => {
           break;
         }
 
+        case 'motionSlash': {
+          // SECURITY: Validate motion slash coordinates
+          if (!data.from || !data.to) break;
+          if (!isValidCoord(data.from.x) || !isValidCoord(data.from.y)) break;
+          if (!isValidCoord(data.to.x) || !isValidCoord(data.to.y)) break;
+
+          const controllerInfo = controllers.get(ws);
+          if (controllerInfo && activeScreen && activeScreen.readyState === WebSocket.OPEN) {
+            activeScreen.send(JSON.stringify({
+              type: 'motionSlash',
+              playerId: controllerInfo.id,
+              color: controllerInfo.color,
+              from: data.from,
+              to: data.to,
+              speed: data.speed || 20,
+              direction: typeof data.direction === 'string' ? data.direction.substring(0, 32) : 'Slash'
+            }));
+          }
+          break;
+        }
+
         case 'startGame':
           // Forward start game request to screen
           if (activeScreen && activeScreen.readyState === WebSocket.OPEN) {

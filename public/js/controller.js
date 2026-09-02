@@ -32,6 +32,17 @@ let offeredPlayerId = null;
 let defaultPlayerName = '';
 let currentGameState = 'LOBBY';
 
+// Controller Mode ('touch' | 'motion')
+let controllerMode = 'touch';
+let motionSensitivity = 'normal'; // 'normal' (threshold: 18) | 'high' (threshold: 13)
+let motionThreshold = 18;
+let lastSwingTime = 0;
+const SWING_COOLDOWN_MS = 260;
+let hasMotionPermission = false;
+let isMotionListening = false;
+let currentDeviceOrientation = { alpha: 0, beta: 0, gamma: 0 };
+let peakGaugeValue = 0;
+
 // Touch state variables
 let isTouching = false;
 let lastX = 0;
@@ -53,6 +64,18 @@ const setupForm = document.getElementById('setup-form');
 const overlaySetup = document.getElementById('overlay-setup');
 const hudContainer = document.getElementById('hud-container');
 const gameOverOverlay = document.getElementById('game-over-overlay');
+
+// Mode Switch & Motion Panel Elements
+const btnModeTouch = document.getElementById('btn-mode-touch');
+const btnModeMotion = document.getElementById('btn-mode-motion');
+const motionPanel = document.getElementById('motion-katana-panel');
+const motionPermBanner = document.getElementById('motion-perm-banner');
+const katanaBladeVisual = document.getElementById('katana-blade-visual');
+const swingDirectionHint = document.getElementById('swing-direction-hint');
+const swingGaugeFill = document.getElementById('swing-gauge-fill');
+const btnSensitivity = document.getElementById('btn-sensitivity');
+const sensitivityVal = document.getElementById('sensitivity-val');
+const swipeHint = document.getElementById('swipe-hint');
 
 // HUD elements
 const hudScore = document.getElementById('hud-score');
@@ -435,6 +458,9 @@ function handleRegistration(data) {
   if (playerFlagDisplay) {
     playerFlagDisplay.innerText = countryCodeToFlagEmoji(playerCountry);
   }
+  if (katanaBladeVisual) {
+    katanaBladeVisual.style.color = playerColor;
+  }
 
   // Switch Screens: hide setup overlay, show active HUD
   if (overlaySetup) overlaySetup.classList.add('hidden');
@@ -744,3 +770,232 @@ const notifyExit = () => {
 
 window.addEventListener('pagehide', notifyExit);
 window.addEventListener('beforeunload', notifyExit);
+
+// ============================================================
+// 3D MOTION KATANA ENGINE (Accelerometer & Gyroscope)
+// ============================================================
+
+function setControllerMode(mode) {
+  vibrateTap();
+  controllerMode = mode;
+
+  if (btnModeTouch) btnModeTouch.classList.toggle('active', mode === 'touch');
+  if (btnModeMotion) btnModeMotion.classList.toggle('active', mode === 'motion');
+
+  if (mode === 'motion') {
+    if (motionPanel) motionPanel.classList.remove('hidden');
+    if (swipeHint) swipeHint.innerText = '⚔️ Hold phone like a Katana & swing in air!';
+    
+    // Check if iOS Safari permission is needed
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function' && !hasMotionPermission) {
+      if (motionPermBanner) motionPermBanner.classList.remove('hidden');
+    } else {
+      if (motionPermBanner) motionPermBanner.classList.add('hidden');
+      startMotionListeners();
+    }
+  } else {
+    // Switch to touch mode
+    if (motionPanel) motionPanel.classList.add('hidden');
+    if (swipeHint) swipeHint.innerText = '🗡️ Swipe anywhere on screen to slash!';
+    stopMotionListeners();
+  }
+}
+
+// Request permission on iOS 13+ (must be triggered from button tap)
+function requestMotionPermission() {
+  vibrateTap();
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    DeviceMotionEvent.requestPermission()
+      .then((state) => {
+        if (state === 'granted') {
+          hasMotionPermission = true;
+          if (motionPermBanner) motionPermBanner.classList.add('hidden');
+          startMotionListeners();
+          if (navigator.vibrate) navigator.vibrate([40, 30, 60]);
+        } else {
+          alert('Motion sensor permission was denied. Switched to Touchpad mode.');
+          setControllerMode('touch');
+        }
+      })
+      .catch((err) => {
+        console.warn('DeviceMotionEvent permission error:', err);
+        setControllerMode('touch');
+      });
+  } else {
+    startMotionListeners();
+  }
+}
+
+// Toggle sensitivity between NORMAL (18 m/s²) and HIGH (13 m/s²)
+function toggleSensitivity() {
+  vibrateTap();
+  if (motionSensitivity === 'normal') {
+    motionSensitivity = 'high';
+    motionThreshold = 13;
+  } else {
+    motionSensitivity = 'normal';
+    motionThreshold = 18;
+  }
+  if (sensitivityVal) {
+    sensitivityVal.innerText = motionSensitivity.toUpperCase();
+    sensitivityVal.style.color = motionSensitivity === 'high' ? '#33ff66' : '#ffaa00';
+  }
+}
+
+let gaugeAnimationId = null;
+function startMotionListeners() {
+  if (isMotionListening) return;
+
+  window.addEventListener('devicemotion', handleDeviceMotion, { passive: true });
+  window.addEventListener('deviceorientation', handleDeviceOrientation, { passive: true });
+  isMotionListening = true;
+
+  // Power gauge smooth decay loop
+  function updateGauge() {
+    peakGaugeValue = Math.max(0, peakGaugeValue - 3.5);
+    if (swingGaugeFill) {
+      swingGaugeFill.style.width = `${peakGaugeValue}%`;
+    }
+    if (isMotionListening) {
+      gaugeAnimationId = requestAnimationFrame(updateGauge);
+    }
+  }
+  gaugeAnimationId = requestAnimationFrame(updateGauge);
+}
+
+function stopMotionListeners() {
+  if (!isMotionListening) return;
+  window.removeEventListener('devicemotion', handleDeviceMotion);
+  window.removeEventListener('deviceorientation', handleDeviceOrientation);
+  isMotionListening = false;
+  if (gaugeAnimationId) {
+    cancelAnimationFrame(gaugeAnimationId);
+    gaugeAnimationId = null;
+  }
+  if (swingGaugeFill) {
+    swingGaugeFill.style.width = '0%';
+  }
+}
+
+// Track orientation for visual katana blade tilt
+function handleDeviceOrientation(e) {
+  if (!e) return;
+  currentDeviceOrientation.alpha = e.alpha || 0;
+  currentDeviceOrientation.beta = e.beta || 0;
+  currentDeviceOrientation.gamma = e.gamma || 0;
+
+  if (katanaBladeVisual) {
+    // Tilt the blade on screen according to device roll (gamma)
+    const tilt = Math.max(-45, Math.min(45, (e.gamma || 0) * 0.8));
+    katanaBladeVisual.style.transform = `rotateZ(${tilt}deg)`;
+  }
+}
+
+// Main Acceleration & Katana Swing Detection
+function handleDeviceMotion(e) {
+  if (!isRegistered || !e) return;
+
+  // Prefer acceleration without gravity if provided, else filter gravity out
+  let ax = 0, ay = 0, az = 0, netMag = 0;
+
+  if (e.acceleration && e.acceleration.x !== null) {
+    ax = e.acceleration.x || 0;
+    ay = e.acceleration.y || 0;
+    az = e.acceleration.z || 0;
+    netMag = Math.sqrt(ax * ax + ay * ay + az * az);
+  } else if (e.accelerationIncludingGravity && e.accelerationIncludingGravity.x !== null) {
+    ax = e.accelerationIncludingGravity.x || 0;
+    ay = e.accelerationIncludingGravity.y || 0;
+    az = e.accelerationIncludingGravity.z || 0;
+    const rawMag = Math.sqrt(ax * ax + ay * ay + az * az);
+    netMag = Math.max(0, rawMag - 9.8);
+  }
+
+  // Update real-time swing power gauge
+  const currentPct = Math.min(100, Math.round((netMag / 30) * 100));
+  if (currentPct > peakGaugeValue) {
+    peakGaugeValue = currentPct;
+  }
+
+  // Detect Katana Swing spike
+  const now = Date.now();
+  if (netMag >= motionThreshold && (now - lastSwingTime >= SWING_COOLDOWN_MS)) {
+    lastSwingTime = now;
+    triggerMotionSlash(ax, ay, az, netMag);
+  }
+}
+
+function triggerMotionSlash(ax, ay, az, magnitude) {
+  // Determine trajectory on the 2D canvas based on 3D motion vector
+  let from = { x: 0.1, y: 0.5 };
+  let to = { x: 0.9, y: 0.5 };
+  let dirLabel = 'Slash ⚔️';
+
+  const absX = Math.abs(ax);
+  const absY = Math.abs(ay);
+  const randomJitter = (Math.random() - 0.5) * 0.16;
+
+  // Horizontal Left-to-Right
+  if (ax > 3.5 && absX > absY * 0.7) {
+    from = { x: 0.05, y: Math.max(0.15, Math.min(0.85, 0.45 + randomJitter)) };
+    to = { x: 0.95, y: Math.max(0.15, Math.min(0.85, 0.55 + randomJitter)) };
+    dirLabel = 'Horizontal Slash ➔';
+  }
+  // Horizontal Right-to-Left
+  else if (ax < -3.5 && absX > absY * 0.7) {
+    from = { x: 0.95, y: Math.max(0.15, Math.min(0.85, 0.45 + randomJitter)) };
+    to = { x: 0.05, y: Math.max(0.15, Math.min(0.85, 0.55 + randomJitter)) };
+    dirLabel = 'Horizontal Slash ⬅';
+  }
+  // Vertical Downward Chop
+  else if (ay < -3.5 || az < -6) {
+    from = { x: Math.max(0.15, Math.min(0.85, 0.5 + randomJitter)), y: 0.05 };
+    to = { x: Math.max(0.15, Math.min(0.85, 0.5 - randomJitter)), y: 0.95 };
+    dirLabel = 'Downward Chop ⬇';
+  }
+  // Diagonal Slash
+  else {
+    const isForward = ax >= 0;
+    from = { x: isForward ? 0.08 : 0.92, y: 0.85 };
+    to = { x: isForward ? 0.92 : 0.08, y: 0.15 };
+    dirLabel = 'Diagonal Slash ⚔️';
+  }
+
+  // Broadcast motion slash over WebSocket
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: 'motionSlash',
+      playerId,
+      color: playerColor,
+      from,
+      to,
+      speed: Math.round(magnitude * 10) / 10,
+      direction: dirLabel
+    }));
+  }
+
+  // Visual & Haptic feedback on phone
+  if (katanaBladeVisual) {
+    katanaBladeVisual.classList.add('slash-active');
+    setTimeout(() => {
+      if (katanaBladeVisual) katanaBladeVisual.classList.remove('slash-active');
+    }, 180);
+  }
+
+  if (swingDirectionHint) {
+    swingDirectionHint.innerText = `⚔️ ${dirLabel}!`;
+    swingDirectionHint.classList.add('slashed');
+    setTimeout(() => {
+      if (swingDirectionHint) {
+        swingDirectionHint.classList.remove('slashed');
+        swingDirectionHint.innerText = 'Ready! Swing phone in air';
+      }
+    }, 450);
+  }
+
+  // Swing sound/haptic rumble
+  if (navigator.vibrate) {
+    navigator.vibrate([25, 20, 35]);
+  }
+}
+

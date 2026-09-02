@@ -363,6 +363,265 @@ body {
   text-transform: uppercase;
 }
 
+/* Controller Mode Segmented Toggle */
+.controller-mode-toggle {
+  display: flex;
+  background: rgba(14, 18, 25, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 30px;
+  padding: 4px;
+  margin: 6px 0;
+  pointer-events: auto;
+  gap: 4px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  width: 100%;
+  max-width: 320px;
+  align-self: center;
+}
+
+.ctrl-mode-btn {
+  flex: 1;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  padding: 10px 14px;
+  border-radius: 24px;
+  border: none;
+  background: transparent;
+  color: #8a94a6;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  touch-action: manipulation;
+}
+
+.ctrl-mode-btn.active {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.08) 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+}
+
+.ctrl-mode-btn:active {
+  transform: scale(0.96);
+}
+
+/* Motion Katana Visual Panel */
+.motion-katana-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 340px;
+  align-self: center;
+  gap: 12px;
+  pointer-events: auto;
+  animation: fadeInMotion 0.3s ease;
+}
+
+@keyframes fadeInMotion {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* iOS Permission Banner */
+.motion-perm-banner {
+  background: linear-gradient(135deg, rgba(255, 51, 102, 0.18) 0%, rgba(255, 170, 0, 0.12) 100%);
+  border: 1px solid rgba(255, 51, 102, 0.45);
+  border-radius: 18px;
+  padding: 14px 16px;
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+  box-shadow: 0 8px 24px rgba(255, 51, 102, 0.25);
+}
+
+.perm-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #ffaa00;
+  margin-bottom: 4px;
+}
+
+.perm-desc {
+  font-size: 0.78rem;
+  color: #d1d5db;
+  line-height: 1.35;
+  margin-bottom: 10px;
+}
+
+.perm-btn {
+  padding: 12px 20px;
+  font-size: 0.92rem;
+  letter-spacing: 0.08em;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ff3366 0%, #ff8800 100%);
+  box-shadow: 0 4px 16px rgba(255, 51, 102, 0.5);
+}
+
+/* Interactive Katana Blade Visualizer */
+.katana-blade-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 140px;
+  position: relative;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.04) 0%, transparent 70%);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.katana-blade-visual {
+  position: relative;
+  width: 180px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  transform-origin: center center;
+  transition: transform 0.08s ease-out, filter 0.12s ease;
+}
+
+.blade-hilt {
+  width: 32px;
+  height: 10px;
+  background: linear-gradient(90deg, #111 0%, #333 100%);
+  border-radius: 3px;
+  border: 1px solid #555;
+  flex-shrink: 0;
+}
+
+.blade-guard {
+  width: 6px;
+  height: 20px;
+  background: #ffcc00;
+  border-radius: 2px;
+  box-shadow: 0 0 8px rgba(255, 204, 0, 0.6);
+  flex-shrink: 0;
+}
+
+.blade-steel {
+  flex: 1;
+  height: 8px;
+  background: linear-gradient(180deg, #ffffff 0%, #d0d5dd 50%, #98a2b3 100%);
+  border-radius: 0 10px 10px 0;
+  position: relative;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.6);
+}
+
+.blade-aura {
+  position: absolute;
+  top: -12px;
+  left: 0;
+  right: 0;
+  bottom: -12px;
+  border-radius: 12px;
+  background: radial-gradient(ellipse at center, currentColor 0%, transparent 70%);
+  opacity: 0.35;
+  filter: blur(8px);
+  pointer-events: none;
+  transition: opacity 0.1s ease;
+}
+
+/* Katana Slash Active Flash Effect */
+.katana-blade-visual.slash-active {
+  filter: brightness(2) drop-shadow(0 0 25px currentColor);
+  transform: scale(1.18);
+}
+
+.katana-blade-visual.slash-active .blade-aura {
+  opacity: 0.95;
+  filter: blur(14px);
+}
+
+.swing-direction-hint {
+  margin-top: 14px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+  text-transform: uppercase;
+  transition: color 0.15s ease;
+}
+
+.swing-direction-hint.slashed {
+  color: #ffaa00;
+  text-shadow: 0 0 10px rgba(255, 170, 0, 0.7);
+}
+
+/* Motion Power Gauge & Sensitivity Switch */
+.motion-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+}
+
+.swing-power-gauge {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gauge-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.gauge-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.gauge-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #33ff66 0%, #ffaa00 70%, #ff3366 100%);
+  border-radius: 6px;
+  transition: width 0.06s ease-out;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.sensitivity-toggle {
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #e2e8f0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: all 0.2s ease;
+}
+
+.sensitivity-toggle:active {
+  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.sensitivity-toggle #sensitivity-val {
+  color: #ffaa00;
+  font-weight: 900;
+}
+
 .hud-center {
   display: flex;
   flex-direction: column;

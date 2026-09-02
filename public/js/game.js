@@ -438,6 +438,9 @@ function initWebSocket(hostIp) {
         case 'touchEnd':
           handleTouchEnd(data);
           break;
+        case 'motionSlash':
+          handleMotionSlash(data);
+          break;
         case 'startGame':
           if (gameState === 'LOBBY' || gameState === 'GAMEOVER') {
             startGame();
@@ -695,6 +698,62 @@ function handleTouchEnd(data) {
 
   // Don't delete the trail immediately — let age-out in updatePhysics handle the fade
   // This ensures the visual trail lingers for a moment after lifting finger
+}
+
+// 3D Motion Katana Slash Handler
+function handleMotionSlash(data) {
+  const pId = data.playerId;
+  if (!players[pId] && data.color) {
+    registerPlayer(pId, data.color, `Player ${pId}`);
+  }
+  if (!players[pId]) return;
+
+  if (!data.from || !data.to) return;
+
+  const p1 = { x: data.from.x * canvas.width, y: data.from.y * canvas.height };
+  const p2 = { x: data.to.x * canvas.width, y: data.to.y * canvas.height };
+
+  // Trigger sword slash sound
+  audio.playSwish();
+
+  // Create intense Katana blade trail across the screen
+  if (!swipeTrails[pId]) {
+    swipeTrails[pId] = [];
+  }
+  const trail = swipeTrails[pId];
+  const TRAIL_STEPS = 18;
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+
+  for (let s = 0; s <= TRAIL_STEPS; s++) {
+    const t = s / TRAIL_STEPS;
+    trail.push({
+      x: p1.x + dx * t,
+      y: p1.y + dy * t,
+      age: 0
+    });
+  }
+  // Trim older trail points if necessary
+  while (trail.length > 32) {
+    trail.shift();
+  }
+
+  // Check collision along the entire length of the blade slash
+  if (gameState === 'PLAYING') {
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const steps = Math.max(8, Math.ceil(dist / 25));
+    let fromPt = p1;
+
+    for (let s = 1; s <= steps; s++) {
+      const t = s / steps;
+      const toPt = { x: p1.x + dx * t, y: p1.y + dy * t };
+      checkCollisions(pId, fromPt, toPt);
+      fromPt = toPt;
+    }
+
+    // Evaluate combos
+    checkCombo(pId);
+  }
 }
 
 function checkSlashCollisions(playerId, slash) {
