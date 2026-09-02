@@ -569,6 +569,10 @@ const wss = new WebSocket.Server({ server, maxPayload: 4096 });
 
 wss.on('connection', (ws, req) => {
   const clientIp = getClientIp(req);
+  ws.isAlive = true;
+  ws.on('pong', () => {
+    ws.isAlive = true;
+  });
 
   // SECURITY: Block banned IPs from connecting to WebSocket
   if (isIpBanned(clientIp)) {
@@ -750,6 +754,27 @@ wss.on('connection', (ws, req) => {
           }
           break;
 
+        case 'leaveGame': {
+          // Immediately free player slot and inform the game screen
+          if (controllers.has(ws)) {
+            const slot = controllers.get(ws);
+            slot.occupied = false;
+            slot.ws = null;
+            const defaultNames = ['Red Player', 'Green Player', 'Blue Player', 'Yellow Player'];
+            slot.name = defaultNames[slot.id - 1] || `Player ${slot.id}`;
+            controllers.delete(ws);
+            console.log(`Player ${slot.id} left the game (slot released immediately)`);
+
+            if (activeScreen && activeScreen.readyState === WebSocket.OPEN) {
+              activeScreen.send(JSON.stringify({
+                type: 'playerLeft',
+                playerId: slot.id
+              }));
+            }
+          }
+          break;
+        }
+
         case 'gameSync':
           // The screen sends state updates (score, lives, etc.) to sync with all controllers
           controllers.forEach((slot, controllerWs) => {
@@ -827,6 +852,22 @@ wss.on('connection', (ws, req) => {
       }
     }
   });
+});
+
+// Periodic heartbeat: ping all active sockets every 3 seconds to immediately detect and free closed mobile tabs
+const heartbeatInterval = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.isAlive === false) {
+      // Socket did not respond to last ping — reap immediately
+      return ws.terminate();
+    }
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 3000);
+
+server.on('close', () => {
+  clearInterval(heartbeatInterval);
 });
 
 server.on('error', (err) => {

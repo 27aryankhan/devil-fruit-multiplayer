@@ -473,7 +473,18 @@ function requestGoBack() {
   if (hudContainer) hudContainer.classList.add('hidden');
   if (overlaySetup) overlaySetup.classList.remove('hidden');
 
+  // Reset join button state
+  if (joinBtn) {
+    joinBtn.disabled = false;
+    joinBtn.innerText = '⚔️ ENTER GAME';
+  }
+
+  isRegistered = false;
+
   if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: 'leaveGame'
+    }));
     socket.send(JSON.stringify({
       type: 'returnToLobby'
     }));
@@ -720,3 +731,16 @@ function vibrateTap() {
     navigator.vibrate(35);
   }
 }
+
+// Immediately notify server and free player slot when user leaves or closes tab
+const notifyExit = () => {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    try {
+      socket.send(JSON.stringify({ type: 'leaveGame' }));
+      socket.close(1000, 'User Navigated Away');
+    } catch (e) {}
+  }
+};
+
+window.addEventListener('pagehide', notifyExit);
+window.addEventListener('beforeunload', notifyExit);
