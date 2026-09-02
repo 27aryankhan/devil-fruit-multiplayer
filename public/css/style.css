@@ -351,17 +351,27 @@ body {
   gap: 8px;
   flex: 1;
   min-height: 0;
-  max-height: 560px;
+  max-height: none;
   overflow-y: auto;
   padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 51, 102, 0.6) rgba(0, 0, 0, 0.25);
 }
 
 .lb-list::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
+}
+.lb-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
 }
 .lb-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
+  background: linear-gradient(180deg, #ff3366, #ffaa00);
+  border-radius: 8px;
+  box-shadow: 0 0 6px rgba(255, 51, 102, 0.4);
+}
+.lb-list::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #ff5588, #ffbb22);
 }
 
 .lb-row {
