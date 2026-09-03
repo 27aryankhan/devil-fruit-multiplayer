@@ -942,9 +942,56 @@ function handleDeviceMotion(e) {
   }
 }
 
+// ============================================================
+// PHONE SPEAKER AUDIO SYNTHESIZER (Wii-style Hand Sound)
+// ============================================================
+let phoneAudioCtx = null;
+function initPhoneAudio() {
+  if (phoneAudioCtx) return;
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) {
+      phoneAudioCtx = new AudioCtx();
+    }
+  } catch (e) {}
+}
+
+function playPhoneKatanaSwish(speed = 20) {
+  if (!phoneAudioCtx) initPhoneAudio();
+  if (!phoneAudioCtx) return;
+  try {
+    if (phoneAudioCtx.state === 'suspended') {
+      phoneAudioCtx.resume();
+    }
+    const now = phoneAudioCtx.currentTime;
+    const osc = phoneAudioCtx.createOscillator();
+    const gain = phoneAudioCtx.createGain();
+
+    const pitch = Math.min(2.2, Math.max(0.75, speed / 18));
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(580 * pitch, now);
+    osc.frequency.exponentialRampToValueAtTime(55, now + 0.18);
+
+    gain.gain.setValueAtTime(0.28, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+    osc.connect(gain);
+    gain.connect(phoneAudioCtx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.19);
+  } catch (e) {}
+}
+
+// Unlock audio context on any user tap
+window.addEventListener('touchstart', () => initPhoneAudio(), { once: true, passive: true });
+window.addEventListener('mousedown', () => initPhoneAudio(), { once: true, passive: true });
+
 function triggerMotionSlash(ax, ay, az, magnitude, rotRate = {}) {
   const gammaDeg = currentDeviceOrientation.gamma || 0;
   const betaDeg = currentDeviceOrientation.beta || 0;
+  const gammaRad = gammaDeg * (Math.PI / 180);
+  const betaRad = betaDeg * (Math.PI / 180);
 
   // Detect screen orientation if device is rotated into landscape (0, 90, 180, 270)
   let screenAngle = 0;
@@ -953,73 +1000,93 @@ function triggerMotionSlash(ax, ay, az, magnitude, rotRate = {}) {
   } else if (window.orientation !== undefined) {
     screenAngle = window.orientation;
   }
+  const screenAngleRad = screenAngle * (Math.PI / 180);
 
-  // Effective tilt angle in radians relative to upright portrait
-  const tiltDeg = (screenAngle !== 0) ? screenAngle : gammaDeg;
-  const tiltRad = tiltDeg * (Math.PI / 180);
+  // Effective roll: physical tilt + screen orientation
+  const effectiveRoll = (screenAngle !== 0) ? screenAngleRad : gammaRad;
 
-  // Rotate local acceleration vector (ax, ay) by device tilt into true user-aligned horizontal and vertical
-  const cosT = Math.cos(tiltRad);
-  const sinT = Math.sin(tiltRad);
+  // 1. Transform (ax, ay) through roll rotation matrix into user's horizontal frame
+  const cosRoll = Math.cos(effectiveRoll);
+  const sinRoll = Math.sin(effectiveRoll);
 
-  const aHoriz = ax * cosT - ay * sinT;
-  const aVert = ax * sinT + ay * cosT;
+  const xRoll = ax * cosRoll - ay * sinRoll;
+  const yRoll = ax * sinRoll + ay * cosRoll;
 
-  // Determine angle of physical motion (-PI to +PI)
-  const angleRad = Math.atan2(aVert, aHoriz);
-  const angleDeg = angleRad * (180 / Math.PI);
+  // 2. Account for pitch tilt (beta):
+  // When upright (beta ~ 90), vertical movement is along yRoll.
+  // When flat (beta ~ 0), vertical movement is along -az.
+  const sinBeta = Math.sin(betaRad);
+  const cosBeta = Math.cos(betaRad);
 
-  // Determine if device is physically held horizontally (landscape or tilted > 40deg)
-  const isHeldHorizontal = Math.abs(gammaDeg) > 40 || Math.abs(screenAngle) === 90 || Math.abs(screenAngle) === 270;
+  const userHoriz = xRoll;
+  const userVert = yRoll * sinBeta - az * cosBeta;
+
+  const absH = Math.abs(userHoriz);
+  const absV = Math.abs(userVert);
+
+  // Is device oriented horizontally (landscape or tilted > 35 deg)?
+  const isHeldHorizontal = Math.abs(gammaDeg) > 35 || Math.abs(screenAngle) === 90 || Math.abs(screenAngle) === 270;
+
+  // Gyroscope angular velocity checks:
+  // Downward pitch rotation (rotRate.beta) is negative when wrist flicks down
+  const isHeavyDownPitch = rotRate.beta < -85;
 
   let from, to, dirLabel;
-  const randomJitter = (Math.random() - 0.5) * 0.12;
+  const randomJitter = (Math.random() - 0.5) * 0.08;
 
-  // A vertical downward chop requires deliberate vertical movement that dominates over horizontal motion
-  // (NOTE: az centripetal arm swing force is NOT treated as a downward chop!)
-  const isClearVerticalChop = (aVert < -4.2 && Math.abs(aVert) > Math.abs(aHoriz) * 1.35) || 
-                              (rotRate.beta < -110 && Math.abs(aHoriz) < 3.0);
+  // Real-time Pitch Aiming for Horizontal Slices (aiming hand up cuts top, aiming down cuts bottom)
+  // betaDeg ranges: >70 (aim high), 45-70 (aim mid), <45 (aim low)
+  const aimY = Math.max(0.18, Math.min(0.82, 0.50 - (betaDeg - 55) * 0.008 + randomJitter));
 
-  if (isClearVerticalChop) {
-    // Deliberate Downward Chop
-    from = { x: Math.max(0.15, Math.min(0.85, 0.5 + randomJitter)), y: 0.05 };
-    to = { x: Math.max(0.15, Math.min(0.85, 0.5 - randomJitter)), y: 0.95 };
+  // Real-time Roll/Yaw Aiming for Vertical Chops (aiming hand left cuts left, aiming right cuts right)
+  const aimX = Math.max(0.18, Math.min(0.82, 0.50 + (gammaDeg / 60) * 0.25 + randomJitter));
+
+  // ACCURATE DIRECTION DISCRIMINATION:
+  // 1. Deliberate Vertical Downward Chop
+  if ((userVert < -3.8 && absV > absH * 1.22) || (isHeavyDownPitch && absH < 4.5)) {
+    from = { x: aimX, y: 0.05 };
+    to = { x: aimX - randomJitter * 0.5, y: 0.95 };
     dirLabel = 'Downward Chop ⬇';
-  } else if (isHeldHorizontal || Math.abs(angleDeg) <= 40 || Math.abs(angleDeg) >= 140) {
-    // Guaranteed Horizontal Slash when held horizontally or moving along horizontal plane
-    if (aHoriz >= 0) {
-      from = { x: 0.05, y: Math.max(0.18, Math.min(0.82, 0.48 + randomJitter)) };
-      to = { x: 0.95, y: Math.max(0.18, Math.min(0.82, 0.52 + randomJitter)) };
+  }
+  // 2. Deliberate Vertical Upward Cut
+  else if (userVert > 3.8 && absV > absH * 1.3) {
+    from = { x: aimX, y: 0.95 };
+    to = { x: aimX + randomJitter * 0.5, y: 0.05 };
+    dirLabel = 'Upward Cut ⬆';
+  }
+  // 3. Guaranteed Horizontal Slash (Left <-> Right)
+  // Fires when swinging side-to-side or holding phone horizontally
+  else if (isHeldHorizontal || absH >= absV * 0.75) {
+    if (userHoriz >= 0) {
+      from = { x: 0.05, y: aimY };
+      to = { x: 0.95, y: aimY + randomJitter * 0.5 };
       dirLabel = 'Horizontal Slash ➔';
     } else {
-      from = { x: 0.95, y: Math.max(0.18, Math.min(0.82, 0.48 + randomJitter)) };
-      to = { x: 0.05, y: Math.max(0.18, Math.min(0.82, 0.52 + randomJitter)) };
+      from = { x: 0.95, y: aimY };
+      to = { x: 0.05, y: aimY + randomJitter * 0.5 };
       dirLabel = 'Horizontal Slash ⬅';
     }
-  } else if (angleDeg > 50 && angleDeg < 130) {
-    // Deliberate Upward Cut
-    from = { x: Math.max(0.15, Math.min(0.85, 0.5 + randomJitter)), y: 0.95 };
-    to = { x: Math.max(0.15, Math.min(0.85, 0.5 - randomJitter)), y: 0.05 };
-    dirLabel = 'Upward Cut ⬆';
-  } else {
-    // Diagonal Slashes
-    const isForward = aHoriz >= 0;
-    const isDown = aVert <= 0;
-    if (isForward && isDown) {
-      from = { x: 0.1, y: 0.15 };
-      to = { x: 0.9, y: 0.85 };
+  }
+  // 4. True Diagonal Slash
+  else {
+    const isMovingRight = userHoriz >= 0;
+    const isMovingDown = userVert <= 0;
+
+    if (isMovingRight && isMovingDown) {
+      from = { x: 0.08, y: Math.max(0.1, aimY - 0.35) };
+      to = { x: 0.92, y: Math.min(0.9, aimY + 0.35) };
       dirLabel = 'Diagonal Slash ↘';
-    } else if (isForward && !isDown) {
-      from = { x: 0.1, y: 0.85 };
-      to = { x: 0.9, y: 0.15 };
+    } else if (isMovingRight && !isMovingDown) {
+      from = { x: 0.08, y: Math.min(0.9, aimY + 0.35) };
+      to = { x: 0.92, y: Math.max(0.1, aimY - 0.35) };
       dirLabel = 'Diagonal Slash ↗';
-    } else if (!isForward && isDown) {
-      from = { x: 0.9, y: 0.15 };
-      to = { x: 0.1, y: 0.85 };
+    } else if (!isMovingRight && isMovingDown) {
+      from = { x: 0.92, y: Math.max(0.1, aimY - 0.35) };
+      to = { x: 0.08, y: Math.min(0.9, aimY + 0.35) };
       dirLabel = 'Diagonal Slash ↙';
     } else {
-      from = { x: 0.9, y: 0.85 };
-      to = { x: 0.1, y: 0.15 };
+      from = { x: 0.92, y: Math.min(0.9, aimY + 0.35) };
+      to = { x: 0.08, y: Math.max(0.1, aimY - 0.35) };
       dirLabel = 'Diagonal Slash ↖';
     }
   }
@@ -1056,9 +1123,12 @@ function triggerMotionSlash(ax, ay, az, magnitude, rotRate = {}) {
     }, 450);
   }
 
-  // Swing sound/haptic rumble
+  // Phone speaker sword whoosh sound
+  playPhoneKatanaSwish(magnitude);
+
+  // Phone haptic rumble
   if (navigator.vibrate) {
-    navigator.vibrate([25, 20, 35]);
+    navigator.vibrate([30, 20, 45]);
   }
 }
 
