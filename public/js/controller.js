@@ -627,6 +627,9 @@ function setupTouchpad() {
 
   // Touch Handlers
   touchPad.addEventListener('touchstart', (e) => {
+    // STRICT: In Motion Katana mode, touchscreen slicing is completely removed!
+    if (controllerMode === 'motion') return;
+
     e.preventDefault();
     if (!isRegistered) return;
     requestWakeLock();
@@ -644,6 +647,9 @@ function setupTouchpad() {
   }, { passive: false });
 
   touchPad.addEventListener('touchmove', (e) => {
+    // STRICT: In Motion Katana mode, touchscreen slicing is completely removed!
+    if (controllerMode === 'motion') return;
+
     e.preventDefault();
     if (!isRegistered || !isTouching) return;
 
@@ -675,6 +681,10 @@ function setupTouchpad() {
   }, { passive: false });
 
   const handleTouchEnd = (e) => {
+    if (controllerMode === 'motion') {
+      isTouching = false;
+      return;
+    }
     if (e) e.preventDefault();
     if (!isRegistered || !isTouching) return;
 
@@ -687,6 +697,7 @@ function setupTouchpad() {
 
   // Mouse Handlers (Enables testing on Laptop / Desktop browsers as well as touchscreen)
   touchPad.addEventListener('mousedown', (e) => {
+    if (controllerMode === 'motion') return;
     if (!isRegistered) return;
     isTouching = true;
 
@@ -702,6 +713,7 @@ function setupTouchpad() {
   });
 
   window.addEventListener('mousemove', (e) => {
+    if (controllerMode === 'motion') return;
     if (!isRegistered || !isTouching) return;
 
     const x = Math.max(0, Math.min(1, e.clientX / window.innerWidth));
@@ -730,6 +742,10 @@ function setupTouchpad() {
   });
 
   window.addEventListener('mouseup', () => {
+    if (controllerMode === 'motion') {
+      isTouching = false;
+      return;
+    }
     if (!isRegistered || !isTouching) return;
     isTouching = false;
     sendTouchEvent('touchEnd', lastX, lastY, 0, 0, 0);
@@ -737,6 +753,10 @@ function setupTouchpad() {
 }
 
 function sendTouchEvent(type, x, y, vx, vy, speed) {
+  // STRICT: When in Motion Katana mode, touchscreen slicing is completely DISABLED!
+  // Slices only trigger through physical 3D arm swings in the air.
+  if (controllerMode === 'motion') return;
+
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({
       type,
@@ -751,9 +771,9 @@ function sendTouchEvent(type, x, y, vx, vy, speed) {
   }
 }
 
-// Circular glow ripple on user touch
+// Circular glow ripple on user touch (Only active in Touchpad mode)
 function spawnRipple(clientX, clientY, isMini = false) {
-  if (!touchPad) return;
+  if (controllerMode === 'motion' || !touchPad) return;
   const ripple = document.createElement('div');
   ripple.classList.add('ripple');
   
@@ -778,15 +798,13 @@ function vibrateTap() {
   }
 }
 
-// Immediately notify server and free player slot when user leaves or closes tab
-const notifyExit = () => {
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    try {
-      socket.send(JSON.stringify({ type: 'leaveGame' }));
-      socket.close(1000, 'User Navigated Away');
-    } catch (e) {}
+function notifyExit() {
+  if (socket && socket.readyState === WebSocket.OPEN && isRegistered) {
+    socket.send(JSON.stringify({
+      type: 'leaveGame'
+    }));
   }
-};
+}
 
 window.addEventListener('pagehide', notifyExit);
 window.addEventListener('beforeunload', notifyExit);
@@ -803,21 +821,27 @@ function setControllerMode(mode) {
   if (btnModeMotion) btnModeMotion.classList.toggle('active', mode === 'motion');
 
   if (mode === 'motion') {
+    document.body.classList.add('mode-motion-active');
+    document.body.classList.remove('mode-touch-active');
+
+    if (touchPad) touchPad.style.pointerEvents = 'none';
     if (motionPanel) motionPanel.classList.remove('hidden');
-    if (swipeHint) swipeHint.innerText = '⚔️ Hold phone like a Katana & swing in air!';
+    if (swipeHint) swipeHint.innerText = '⚔️ Motion Katana: Swing phone in air to slice!';
     
     // Check if iOS Safari permission is needed
     if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function' && !hasMotionPermission) {
       if (motionPermBanner) motionPermBanner.classList.remove('hidden');
-      requestMotionPermission();
     } else {
       if (motionPermBanner) motionPermBanner.classList.add('hidden');
       startMotionListeners();
     }
   } else {
-    // Switch to touch mode
+    document.body.classList.remove('mode-motion-active');
+    document.body.classList.add('mode-touch-active');
+
+    if (touchPad) touchPad.style.pointerEvents = 'auto';
     if (motionPanel) motionPanel.classList.add('hidden');
-    if (swipeHint) swipeHint.innerText = '🗡️ Swipe anywhere on screen to slash!';
+    if (swipeHint) swipeHint.innerText = '🗡️ Touchpad: Swipe anywhere on screen to slash!';
     stopMotionListeners();
   }
 
@@ -842,13 +866,12 @@ function requestMotionPermission() {
           startMotionListeners();
           if (navigator.vibrate) navigator.vibrate([40, 30, 60]);
         } else {
-          alert('Motion sensor permission was denied. Switched to Touchpad mode.');
-          setControllerMode('touch');
+          if (motionPermBanner) motionPermBanner.classList.remove('hidden');
         }
       })
       .catch((err) => {
         console.warn('DeviceMotionEvent permission error:', err);
-        setControllerMode('touch');
+        if (motionPermBanner) motionPermBanner.classList.remove('hidden');
       });
   } else {
     startMotionListeners();
