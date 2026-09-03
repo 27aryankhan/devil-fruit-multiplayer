@@ -668,6 +668,10 @@ wss.on('connection', (ws, req) => {
   }
 
   ws.on('message', (message) => {
+    // Reset heartbeat whenever client sends any data (swings, touches, pings)
+    ws.isAlive = true;
+    ws.missedPings = 0;
+
     // SECURITY: Rate limiting — disconnect and auto-ban clients that flood messages
     if (!ws._rateLimiter.check()) {
       ws._violationCount = (ws._violationCount || 0) + 1;
@@ -942,17 +946,22 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-// Periodic heartbeat: ping active sockets every 1.2s to instantly detect closed/suspended mobile tabs
+// Periodic heartbeat: ping active sockets every 6s with 3 missed pings tolerance (18s total timeout)
 const heartbeatInterval = setInterval(() => {
   wss.clients.forEach((ws) => {
     if (ws.isAlive === false) {
-      // Socket did not respond to last ping — reap immediately
-      return ws.terminate();
+      ws.missedPings = (ws.missedPings || 0) + 1;
+      if (ws.missedPings >= 3) {
+        console.log(`Reaping dead socket after 3 missed pings`);
+        return ws.terminate();
+      }
+    } else {
+      ws.missedPings = 0;
     }
     ws.isAlive = false;
     ws.ping();
   });
-}, 1200);
+}, 6000);
 
 server.on('close', () => {
   clearInterval(heartbeatInterval);

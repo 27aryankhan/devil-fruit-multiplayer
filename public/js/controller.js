@@ -34,8 +34,8 @@ let currentGameState = 'LOBBY';
 
 // Controller Mode ('touch' | 'motion')
 let controllerMode = 'motion';
-let motionSensitivity = 'normal'; // 'normal' (threshold: 18) | 'high' (threshold: 13)
-let motionThreshold = 18;
+let motionSensitivity = 'normal'; // 'normal' (threshold: 11) | 'high' (threshold: 8.5)
+let motionThreshold = 11;
 let lastSwingTime = 0;
 const SWING_COOLDOWN_MS = 260;
 let hasMotionPermission = false;
@@ -836,12 +836,22 @@ window.addEventListener('pagehide', notifyExit);
 window.addEventListener('beforeunload', notifyExit);
 window.addEventListener('unload', notifyExit);
 
+let hiddenExitTimer = null;
+
 // Handle mobile backgrounding, app-switching, screen lock, and return
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
-    notifyExit();
+    // 4-second grace period: avoids kicking player out on brief screen tilt, notifications, or dimming
+    hiddenExitTimer = setTimeout(() => {
+      notifyExit();
+    }, 4000);
   } else if (document.visibilityState === 'visible') {
-    // When user returns to tab, ensure a clean fresh connection
+    if (hiddenExitTimer) {
+      clearTimeout(hiddenExitTimer);
+      hiddenExitTimer = null;
+    }
+    requestWakeLock();
+    // When user returns to tab, reconnect only if socket was actually closed
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       isRegistered = false;
       if (hudContainer) hudContainer.classList.add('hidden');
@@ -929,10 +939,10 @@ function toggleSensitivity() {
   vibrateTap();
   if (motionSensitivity === 'normal') {
     motionSensitivity = 'high';
-    motionThreshold = 13;
+    motionThreshold = 8.5;
   } else {
     motionSensitivity = 'normal';
-    motionThreshold = 18;
+    motionThreshold = 11;
   }
   if (sensitivityVal) {
     sensitivityVal.innerText = motionSensitivity.toUpperCase();
@@ -1024,11 +1034,20 @@ function handleDeviceMotion(e) {
     peakGaugeValue = currentPct;
   }
 
-  // Detect Katana Swing spike
+  // Detect Katana Swing spike (combines linear acceleration with gyroscope angular speed)
   const now = Date.now();
-  if (netMag >= motionThreshold && (now - lastSwingTime >= SWING_COOLDOWN_MS)) {
+  const gyroSpeed = Math.sqrt(
+    (rotRate.alpha || 0) ** 2 +
+    (rotRate.beta || 0) ** 2 +
+    (rotRate.gamma || 0) ** 2
+  );
+
+  const isSwingSpike = (netMag >= motionThreshold) || (gyroSpeed > 220 && netMag >= 7.5);
+
+  if (isSwingSpike && (now - lastSwingTime >= SWING_COOLDOWN_MS)) {
     lastSwingTime = now;
-    triggerMotionSlash(ax, ay, az, netMag, rotRate);
+    requestWakeLock();
+    triggerMotionSlash(ax, ay, az, Math.max(netMag, gyroSpeed / 20), rotRate);
   }
 }
 

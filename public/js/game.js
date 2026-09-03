@@ -719,6 +719,11 @@ function handleMotionSlash(data) {
   const p1 = { x: data.from.x * canvas.width, y: data.from.y * canvas.height };
   const p2 = { x: data.to.x * canvas.width, y: data.to.y * canvas.height };
 
+  // If match hasn't started yet, auto-start on katana air swing
+  if (gameState === 'LOBBY') {
+    startGame();
+  }
+
   // Trigger sword slash sound with speed-scaled pitch
   if (audio.playMotionKatanaSlash) {
     audio.playMotionKatanaSlash(data.speed || 20);
