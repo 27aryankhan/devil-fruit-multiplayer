@@ -525,16 +525,25 @@ function requestGoBack() {
     joinBtn.innerText = '⚔️ ENTER GAME';
   }
 
+  const leavingPlayerId = playerId;
   isRegistered = false;
 
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({
-      type: 'leaveGame'
+      type: 'leaveGame',
+      playerId: leavingPlayerId
     }));
     socket.send(JSON.stringify({
       type: 'returnToLobby'
     }));
   }
+
+  try {
+    if (navigator.sendBeacon && leavingPlayerId) {
+      const beaconData = new Blob([JSON.stringify({ playerId: leavingPlayerId })], { type: 'application/json' });
+      navigator.sendBeacon('/api/leave', beaconData);
+    }
+  } catch (e) {}
 }
 
 // --- REAL-TIME SCORE & TIMER SYNC ---
@@ -799,15 +808,52 @@ function vibrateTap() {
 }
 
 function notifyExit() {
-  if (socket && socket.readyState === WebSocket.OPEN && isRegistered) {
-    socket.send(JSON.stringify({
-      type: 'leaveGame'
-    }));
+  if (!isRegistered) return;
+  const leavingPlayerId = playerId;
+  isRegistered = false;
+
+  // 1. Send WebSocket leave packet and immediately close socket
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    try {
+      socket.send(JSON.stringify({
+        type: 'leaveGame',
+        playerId: leavingPlayerId
+      }));
+      socket.close(1000, 'User Exited');
+    } catch (e) {}
   }
+
+  // 2. Mobile Browser Guaranteed Beacon (flushes immediately even if OS background-freezes tab)
+  try {
+    if (navigator.sendBeacon && leavingPlayerId) {
+      const beaconData = new Blob([JSON.stringify({ playerId: leavingPlayerId })], { type: 'application/json' });
+      navigator.sendBeacon('/api/leave', beaconData);
+    }
+  } catch (e) {}
 }
 
 window.addEventListener('pagehide', notifyExit);
 window.addEventListener('beforeunload', notifyExit);
+window.addEventListener('unload', notifyExit);
+
+// Handle mobile backgrounding, app-switching, screen lock, and return
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    notifyExit();
+  } else if (document.visibilityState === 'visible') {
+    // When user returns to tab, ensure a clean fresh connection
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      isRegistered = false;
+      if (hudContainer) hudContainer.classList.add('hidden');
+      if (overlaySetup) overlaySetup.classList.remove('hidden');
+      if (joinBtn) {
+        joinBtn.disabled = false;
+        joinBtn.innerText = '⚔️ ENTER GAME';
+      }
+      connectWebSocket();
+    }
+  }
+});
 
 // ============================================================
 // 3D MOTION KATANA ENGINE (Accelerometer & Gyroscope)

@@ -490,6 +490,58 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+
+  // API: Instant Leave Beacon (Guarantees mobile slot is released in <50ms upon tab exit / app switch)
+  if ((req.method === 'POST' || req.method === 'GET') && (filePath.startsWith('/api/leave') || filePath.startsWith('/leave'))) {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        let pId = null;
+        if (body) {
+          try {
+            const parsed = JSON.parse(body);
+            pId = parsed.playerId;
+          } catch (e) {}
+        }
+        if (!pId && filePath.includes('?')) {
+          const q = new URLSearchParams(filePath.split('?')[1]);
+          pId = parseInt(q.get('id') || q.get('playerId'), 10);
+        }
+
+        if (pId) {
+          const slot = playerSlots.find(s => s.id === pId && s.occupied);
+          if (slot) {
+            if (slot.ws) {
+              controllers.delete(slot.ws);
+              try { slot.ws.close(1000, 'User Exited via Beacon'); } catch(e) {}
+            }
+            slot.occupied = false;
+            slot.ws = null;
+            const defaultNames = ['Red Player', 'Green Player', 'Blue Player', 'Yellow Player'];
+            slot.name = defaultNames[slot.id - 1] || `Player ${slot.id}`;
+            console.log(`[BEACON] Player ${slot.id} slot freed immediately via beacon`);
+
+            if (activeScreen && activeScreen.readyState === WebSocket.OPEN) {
+              activeScreen.send(JSON.stringify({
+                type: 'playerLeft',
+                playerId: slot.id
+              }));
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error handling /api/leave beacon:', e);
+      }
+
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      });
+      res.end(JSON.stringify({ success: true }));
+    });
+    return;
+  }
   
   // Strip query parameters
   const queryIndex = filePath.indexOf('?');
@@ -789,8 +841,11 @@ wss.on('connection', (ws, req) => {
 
         case 'leaveGame': {
           // Immediately free player slot and inform the game screen
-          if (controllers.has(ws)) {
-            const slot = controllers.get(ws);
+          let slot = controllers.get(ws);
+          if (!slot && data.playerId) {
+            slot = playerSlots.find(s => s.id === data.playerId && s.occupied);
+          }
+          if (slot) {
             slot.occupied = false;
             slot.ws = null;
             const defaultNames = ['Red Player', 'Green Player', 'Blue Player', 'Yellow Player'];
@@ -887,7 +942,7 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-// Periodic heartbeat: ping all active sockets every 3 seconds to immediately detect and free closed mobile tabs
+// Periodic heartbeat: ping active sockets every 1.2s to instantly detect closed/suspended mobile tabs
 const heartbeatInterval = setInterval(() => {
   wss.clients.forEach((ws) => {
     if (ws.isAlive === false) {
@@ -897,7 +952,7 @@ const heartbeatInterval = setInterval(() => {
     ws.isAlive = false;
     ws.ping();
   });
-}, 3000);
+}, 1200);
 
 server.on('close', () => {
   clearInterval(heartbeatInterval);
