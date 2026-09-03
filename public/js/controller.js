@@ -893,8 +893,9 @@ function handleDeviceOrientation(e) {
   currentDeviceOrientation.gamma = e.gamma || 0;
 
   if (katanaBladeVisual) {
-    // Tilt the blade on screen according to device roll (gamma)
-    const tilt = Math.max(-45, Math.min(45, (e.gamma || 0) * 0.8));
+    // Allow blade to rotate smoothly with device roll (gamma) up to 90 degrees
+    const gamma = e.gamma || 0;
+    const tilt = Math.max(-90, Math.min(90, gamma));
     katanaBladeVisual.style.transform = `rotateZ(${tilt}deg)`;
   }
 }
@@ -902,6 +903,14 @@ function handleDeviceOrientation(e) {
 // Main Acceleration & Katana Swing Detection
 function handleDeviceMotion(e) {
   if (!isRegistered || !e) return;
+
+  // Rotation rates from gyroscope if available
+  const rot = e.rotationRate || {};
+  const rotRate = {
+    alpha: rot.alpha || 0,
+    beta: rot.beta || 0,
+    gamma: rot.gamma || 0
+  };
 
   // Prefer acceleration without gravity if provided, else filter gravity out
   let ax = 0, ay = 0, az = 0, netMag = 0;
@@ -929,44 +938,90 @@ function handleDeviceMotion(e) {
   const now = Date.now();
   if (netMag >= motionThreshold && (now - lastSwingTime >= SWING_COOLDOWN_MS)) {
     lastSwingTime = now;
-    triggerMotionSlash(ax, ay, az, netMag);
+    triggerMotionSlash(ax, ay, az, netMag, rotRate);
   }
 }
 
-function triggerMotionSlash(ax, ay, az, magnitude) {
-  // Determine trajectory on the 2D canvas based on 3D motion vector
-  let from = { x: 0.1, y: 0.5 };
-  let to = { x: 0.9, y: 0.5 };
-  let dirLabel = 'Slash ⚔️';
+function triggerMotionSlash(ax, ay, az, magnitude, rotRate = {}) {
+  const gammaDeg = currentDeviceOrientation.gamma || 0;
+  const betaDeg = currentDeviceOrientation.beta || 0;
 
-  const absX = Math.abs(ax);
-  const absY = Math.abs(ay);
-  const randomJitter = (Math.random() - 0.5) * 0.16;
+  // Detect screen orientation if device is rotated into landscape (0, 90, 180, 270)
+  let screenAngle = 0;
+  if (window.screen && window.screen.orientation && window.screen.orientation.angle !== undefined) {
+    screenAngle = window.screen.orientation.angle;
+  } else if (window.orientation !== undefined) {
+    screenAngle = window.orientation;
+  }
 
-  // Horizontal Left-to-Right
-  if (ax > 3.5 && absX > absY * 0.7) {
-    from = { x: 0.05, y: Math.max(0.15, Math.min(0.85, 0.45 + randomJitter)) };
-    to = { x: 0.95, y: Math.max(0.15, Math.min(0.85, 0.55 + randomJitter)) };
-    dirLabel = 'Horizontal Slash ➔';
-  }
-  // Horizontal Right-to-Left
-  else if (ax < -3.5 && absX > absY * 0.7) {
-    from = { x: 0.95, y: Math.max(0.15, Math.min(0.85, 0.45 + randomJitter)) };
-    to = { x: 0.05, y: Math.max(0.15, Math.min(0.85, 0.55 + randomJitter)) };
-    dirLabel = 'Horizontal Slash ⬅';
-  }
-  // Vertical Downward Chop
-  else if (ay < -3.5 || az < -6) {
+  // Effective tilt angle in radians relative to upright portrait
+  const tiltDeg = (screenAngle !== 0) ? screenAngle : gammaDeg;
+  const tiltRad = tiltDeg * (Math.PI / 180);
+
+  // Rotate local acceleration vector (ax, ay) by device tilt into true user-aligned horizontal and vertical
+  const cosT = Math.cos(tiltRad);
+  const sinT = Math.sin(tiltRad);
+
+  const aHoriz = ax * cosT - ay * sinT;
+  const aVert = ax * sinT + ay * cosT;
+
+  // Determine angle of physical motion (-PI to +PI)
+  const angleRad = Math.atan2(aVert, aHoriz);
+  const angleDeg = angleRad * (180 / Math.PI);
+
+  // Determine if device is physically held horizontally (landscape or tilted > 40deg)
+  const isHeldHorizontal = Math.abs(gammaDeg) > 40 || Math.abs(screenAngle) === 90 || Math.abs(screenAngle) === 270;
+
+  let from, to, dirLabel;
+  const randomJitter = (Math.random() - 0.5) * 0.12;
+
+  // A vertical downward chop requires deliberate vertical movement that dominates over horizontal motion
+  // (NOTE: az centripetal arm swing force is NOT treated as a downward chop!)
+  const isClearVerticalChop = (aVert < -4.2 && Math.abs(aVert) > Math.abs(aHoriz) * 1.35) || 
+                              (rotRate.beta < -110 && Math.abs(aHoriz) < 3.0);
+
+  if (isClearVerticalChop) {
+    // Deliberate Downward Chop
     from = { x: Math.max(0.15, Math.min(0.85, 0.5 + randomJitter)), y: 0.05 };
     to = { x: Math.max(0.15, Math.min(0.85, 0.5 - randomJitter)), y: 0.95 };
     dirLabel = 'Downward Chop ⬇';
-  }
-  // Diagonal Slash
-  else {
-    const isForward = ax >= 0;
-    from = { x: isForward ? 0.08 : 0.92, y: 0.85 };
-    to = { x: isForward ? 0.92 : 0.08, y: 0.15 };
-    dirLabel = 'Diagonal Slash ⚔️';
+  } else if (isHeldHorizontal || Math.abs(angleDeg) <= 40 || Math.abs(angleDeg) >= 140) {
+    // Guaranteed Horizontal Slash when held horizontally or moving along horizontal plane
+    if (aHoriz >= 0) {
+      from = { x: 0.05, y: Math.max(0.18, Math.min(0.82, 0.48 + randomJitter)) };
+      to = { x: 0.95, y: Math.max(0.18, Math.min(0.82, 0.52 + randomJitter)) };
+      dirLabel = 'Horizontal Slash ➔';
+    } else {
+      from = { x: 0.95, y: Math.max(0.18, Math.min(0.82, 0.48 + randomJitter)) };
+      to = { x: 0.05, y: Math.max(0.18, Math.min(0.82, 0.52 + randomJitter)) };
+      dirLabel = 'Horizontal Slash ⬅';
+    }
+  } else if (angleDeg > 50 && angleDeg < 130) {
+    // Deliberate Upward Cut
+    from = { x: Math.max(0.15, Math.min(0.85, 0.5 + randomJitter)), y: 0.95 };
+    to = { x: Math.max(0.15, Math.min(0.85, 0.5 - randomJitter)), y: 0.05 };
+    dirLabel = 'Upward Cut ⬆';
+  } else {
+    // Diagonal Slashes
+    const isForward = aHoriz >= 0;
+    const isDown = aVert <= 0;
+    if (isForward && isDown) {
+      from = { x: 0.1, y: 0.15 };
+      to = { x: 0.9, y: 0.85 };
+      dirLabel = 'Diagonal Slash ↘';
+    } else if (isForward && !isDown) {
+      from = { x: 0.1, y: 0.85 };
+      to = { x: 0.9, y: 0.15 };
+      dirLabel = 'Diagonal Slash ↗';
+    } else if (!isForward && isDown) {
+      from = { x: 0.9, y: 0.15 };
+      to = { x: 0.1, y: 0.85 };
+      dirLabel = 'Diagonal Slash ↙';
+    } else {
+      from = { x: 0.9, y: 0.85 };
+      to = { x: 0.1, y: 0.15 };
+      dirLabel = 'Diagonal Slash ↖';
+    }
   }
 
   // Broadcast motion slash over WebSocket
