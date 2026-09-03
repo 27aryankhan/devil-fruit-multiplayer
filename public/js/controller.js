@@ -799,6 +799,14 @@ function setControllerMode(mode) {
     if (swipeHint) swipeHint.innerText = '🗡️ Swipe anywhere on screen to slash!';
     stopMotionListeners();
   }
+
+  // Notify server and game screen of controller mode
+  if (socket && socket.readyState === WebSocket.OPEN && isRegistered) {
+    socket.send(JSON.stringify({
+      type: 'controllerMode',
+      mode: mode
+    }));
+  }
 }
 
 // Request permission on iOS 13+ (must be triggered from button tap)

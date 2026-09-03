@@ -441,6 +441,12 @@ function initWebSocket(hostIp) {
         case 'motionSlash':
           handleMotionSlash(data);
           break;
+        case 'controllerMode':
+          if (players[data.playerId]) {
+            players[data.playerId].controllerMode = data.mode;
+            updateHUD();
+          }
+          break;
         case 'startGame':
           if (gameState === 'LOBBY' || gameState === 'GAMEOVER') {
             startGame();
@@ -713,17 +719,45 @@ function handleMotionSlash(data) {
   const p1 = { x: data.from.x * canvas.width, y: data.from.y * canvas.height };
   const p2 = { x: data.to.x * canvas.width, y: data.to.y * canvas.height };
 
-  // Trigger sword slash sound
-  audio.playSwish();
+  // Trigger sword slash sound with speed-scaled pitch
+  if (audio.playMotionKatanaSlash) {
+    audio.playMotionKatanaSlash(data.speed || 20);
+  } else {
+    audio.playSwish();
+  }
+
+  // Spawn electric Katana sparks along the cut trajectory
+  const sparkColor = (players[pId] && players[pId].color) || PLAYER_COLORS[pId] || '#ffcc00';
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const perpBaseAngle = Math.atan2(dy, dx);
+
+  for (let i = 0; i < 16; i++) {
+    const t = Math.random();
+    const px = p1.x + dx * t;
+    const py = p1.y + dy * t;
+    const side = Math.random() > 0.5 ? 1 : -1;
+    const sparkAngle = perpBaseAngle + side * (Math.PI / 2) + (Math.random() - 0.5) * 0.5;
+    const sparkSpeed = Math.random() * 6 + 2.5;
+
+    particles.push({
+      x: px,
+      y: py,
+      vx: Math.cos(sparkAngle) * sparkSpeed,
+      vy: Math.sin(sparkAngle) * sparkSpeed,
+      color: sparkColor,
+      radius: Math.random() * 3 + 1.5,
+      opacity: 1,
+      decay: 0.04
+    });
+  }
 
   // Create intense Katana blade trail across the screen
   if (!swipeTrails[pId]) {
     swipeTrails[pId] = [];
   }
   const trail = swipeTrails[pId];
-  const TRAIL_STEPS = 18;
-  const dx = p2.x - p1.x;
-  const dy = p2.y - p1.y;
+  const TRAIL_STEPS = 20;
 
   for (let s = 0; s <= TRAIL_STEPS; s++) {
     const t = s / TRAIL_STEPS;
@@ -734,7 +768,7 @@ function handleMotionSlash(data) {
     });
   }
   // Trim older trail points if necessary
-  while (trail.length > 32) {
+  while (trail.length > 36) {
     trail.shift();
   }
 
@@ -1174,6 +1208,15 @@ function updateHUD() {
     labelSpan.className = 'hud-score-label';
     labelSpan.style.color = validColor;
     labelSpan.textContent = p.name; // textContent is XSS-safe
+
+    if (p.controllerMode === 'motion') {
+      const modeIcon = document.createElement('span');
+      modeIcon.style.fontSize = '0.85em';
+      modeIcon.style.marginLeft = '4px';
+      modeIcon.title = 'Motion Katana Active';
+      modeIcon.textContent = '⚔️';
+      labelSpan.appendChild(modeIcon);
+    }
 
     const valueSpan = document.createElement('span');
     valueSpan.className = 'hud-score-value';

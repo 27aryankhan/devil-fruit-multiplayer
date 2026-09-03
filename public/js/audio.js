@@ -158,6 +158,58 @@ class GameAudio {
     }
   }
 
+  playMotionKatanaSlash(speed = 20) {
+    if (this.muted || !this.ctx) return;
+    this.resumeContext();
+    const now = this.ctx.currentTime;
+    const pitch = Math.min(2.0, Math.max(0.75, speed / 18));
+
+    // Dynamic metallic swept resonance
+    const osc = this.ctx.createOscillator();
+    const oscGain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(550 * pitch, now);
+    osc.frequency.exponentialRampToValueAtTime(50, now + 0.25);
+    oscGain.gain.setValueAtTime(0.24, now);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+    osc.connect(oscGain);
+    oscGain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.26);
+
+    // High frequency metallic edge glint
+    const metal = this.ctx.createOscillator();
+    const metalGain = this.ctx.createGain();
+    metal.type = 'triangle';
+    metal.frequency.setValueAtTime(3200 * pitch, now);
+    metal.frequency.exponentialRampToValueAtTime(900, now + 0.18);
+    metalGain.gain.setValueAtTime(0.18, now);
+    metalGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    metal.connect(metalGain);
+    metalGain.connect(this.ctx.destination);
+    metal.start(now);
+    metal.stop(now + 0.19);
+
+    // Filtered air whoosh
+    if (this.noiseBuffer) {
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this.noiseBuffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1400 * pitch, now);
+      filter.frequency.exponentialRampToValueAtTime(250, now + 0.22);
+      filter.Q.setValueAtTime(3.2, now);
+      const nGain = this.ctx.createGain();
+      nGain.gain.setValueAtTime(0.18, now);
+      nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      noise.connect(filter);
+      filter.connect(nGain);
+      nGain.connect(this.ctx.destination);
+      noise.start(now);
+      noise.stop(now + 0.23);
+    }
+  }
+
   playSplat() {
     if (this.muted || !this.ctx) return;
     this.resumeContext();

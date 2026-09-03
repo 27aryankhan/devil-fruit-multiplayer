@@ -513,6 +513,25 @@ body {
   border-radius: 0 10px 10px 0;
   position: relative;
   box-shadow: 0 0 12px rgba(255, 255, 255, 0.6);
+  overflow: hidden;
+}
+
+.blade-steel::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95), transparent);
+  transform: skewX(-25deg);
+  animation: bladeGlint 2.8s infinite ease-in-out;
+}
+
+@keyframes bladeGlint {
+  0%, 55% { left: -60%; opacity: 0; }
+  65% { opacity: 1; }
+  95%, 100% { left: 160%; opacity: 0; }
 }
 
 .blade-aura {
@@ -531,8 +550,8 @@ body {
 
 /* Katana Slash Active Flash Effect */
 .katana-blade-visual.slash-active {
-  filter: brightness(2) drop-shadow(0 0 25px currentColor);
-  transform: scale(1.18);
+  filter: brightness(2.2) drop-shadow(0 0 28px currentColor);
+  transform: scale(1.2);
 }
 
 .katana-blade-visual.slash-active .blade-aura {

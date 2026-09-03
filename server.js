@@ -756,6 +756,18 @@ wss.on('connection', (ws, req) => {
           break;
         }
 
+        case 'controllerMode': {
+          const controllerInfo = controllers.get(ws);
+          if (controllerInfo && activeScreen && activeScreen.readyState === WebSocket.OPEN) {
+            activeScreen.send(JSON.stringify({
+              type: 'controllerMode',
+              playerId: controllerInfo.id,
+              mode: data.mode === 'motion' ? 'motion' : 'touch'
+            }));
+          }
+          break;
+        }
+
         case 'startGame':
           // Forward start game request to screen
           if (activeScreen && activeScreen.readyState === WebSocket.OPEN) {
