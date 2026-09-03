@@ -258,15 +258,54 @@ body {
 }
 
 /* Action Button */
+.setup-mode-container {
+  margin-top: 4px;
+}
+
+.setup-mode-segmented {
+  display: flex;
+  background: rgba(14, 18, 25, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  padding: 4px;
+  gap: 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.setup-choice-btn {
+  flex: 1;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.03em;
+  padding: 10px 10px;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  color: #8a94a6;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+}
+
+.setup-choice-btn.active {
+  background: linear-gradient(135deg, rgba(255, 51, 102, 0.35) 0%, rgba(255, 170, 0, 0.25) 100%);
+  border: 1px solid rgba(255, 51, 102, 0.6);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(255, 51, 102, 0.35);
+  text-shadow: 0 0 10px rgba(255, 170, 0, 0.5);
+}
+
 .action-btn {
   font-family: inherit;
-  font-weight: 800;
-  font-size: 1.05rem;
+  font-size: 1.15rem;
+  font-weight: 900;
   letter-spacing: 0.05em;
-  padding: 16px 24px;
-  border-radius: 16px;
-  cursor: pointer;
   border: none;
+  border-radius: 20px;
+  padding: 18px 24px;
+  cursor: pointer;
   background: linear-gradient(135deg, #ff3366 0%, #ff6600 50%, #ffaa00 100%);
   color: #ffffff;
   box-shadow: 0 8px 24px rgba(255, 51, 102, 0.4);

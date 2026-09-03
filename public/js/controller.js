@@ -33,7 +33,7 @@ let defaultPlayerName = '';
 let currentGameState = 'LOBBY';
 
 // Controller Mode ('touch' | 'motion')
-let controllerMode = 'touch';
+let controllerMode = 'motion';
 let motionSensitivity = 'normal'; // 'normal' (threshold: 18) | 'high' (threshold: 13)
 let motionThreshold = 18;
 let lastSwingTime = 0;
@@ -61,6 +61,10 @@ const nameInput = document.getElementById('name-input');
 const countrySelect = document.getElementById('country-select');
 const setupForm = document.getElementById('setup-form');
 
+// Setup screen mode choices
+const setupChoiceMotion = document.getElementById('setup-choice-motion');
+const setupChoiceTouch = document.getElementById('setup-choice-touch');
+
 const overlaySetup = document.getElementById('overlay-setup');
 const hudContainer = document.getElementById('hud-container');
 const gameOverOverlay = document.getElementById('game-over-overlay');
@@ -76,6 +80,14 @@ const swingGaugeFill = document.getElementById('swing-gauge-fill');
 const btnSensitivity = document.getElementById('btn-sensitivity');
 const sensitivityVal = document.getElementById('sensitivity-val');
 const swipeHint = document.getElementById('swipe-hint');
+
+// Setup Screen Mode Switcher
+function setInitialMode(mode) {
+  vibrateTap();
+  controllerMode = mode;
+  if (setupChoiceMotion) setupChoiceMotion.classList.toggle('active', mode === 'motion');
+  if (setupChoiceTouch) setupChoiceTouch.classList.toggle('active', mode === 'touch');
+}
 
 // HUD elements
 const hudScore = document.getElementById('hud-score');
@@ -416,6 +428,11 @@ function requestJoin() {
 
   const chosenCountry = countrySelect ? countrySelect.value : detectUserCountry();
 
+  // If user selected Motion Katana, request iOS Safari motion permission directly on this tap gesture!
+  if (controllerMode === 'motion' && typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function' && !hasMotionPermission) {
+    requestMotionPermission();
+  }
+
   // Register with the server
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({
@@ -465,6 +482,9 @@ function handleRegistration(data) {
   // Switch Screens: hide setup overlay, show active HUD
   if (overlaySetup) overlaySetup.classList.add('hidden');
   if (hudContainer) hudContainer.classList.remove('hidden');
+
+  // Immediately activate selected controller mode (shows motion katana panel & starts sensors)
+  setControllerMode(controllerMode);
 
   // Trigger game start on main screen upon joining
   if (socket && socket.readyState === WebSocket.OPEN) {
@@ -789,6 +809,7 @@ function setControllerMode(mode) {
     // Check if iOS Safari permission is needed
     if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function' && !hasMotionPermission) {
       if (motionPermBanner) motionPermBanner.classList.remove('hidden');
+      requestMotionPermission();
     } else {
       if (motionPermBanner) motionPermBanner.classList.add('hidden');
       startMotionListeners();
