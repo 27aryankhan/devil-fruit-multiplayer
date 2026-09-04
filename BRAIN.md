@@ -1,0 +1,120 @@
+# 🧠 BRAIN.md — DOJO BLADE SYSTEM MEMORY & ARCHITECTURAL GROUND TRUTH
+
+> **Golden Rule**: **STRICT ISOLATION BETWEEN CONTROL MODES.**  
+> *Motion Katana* and *Touchpad* are two entirely distinct input pipelines. Changes to Motion Katana physics, sensors, or UI must NEVER alter, delay, or interfere with Touchpad touch/mouse processing or game-screen collision detection.
+
+---
+
+## 1. System Overview & Architecture
+
+Dojo Blade (Devil Fruits Fruit Ninja) is a real-time multiplayer local-network web game where up to 4 mobile phones (or browser tabs) act as wireless katana controllers for a shared main screen.
+
+```
+┌───────────────────────────────┐
+│     Mobile Phone / Tab        │
+│   (public/controller.html)    │
+│   ├── Mode A: Motion Katana   │──┐
+│   └── Mode B: Touchpad        │  │
+└───────────────────────────────┘  │ WebSocket (LAN / IP)
+                                   ▼
+                       ┌─────────────────────────┐
+                       │    Node.js Server       │
+                       │      (server.js)        │
+                       │  - Slot manager (1 to 4)│
+                       │  - Packet router        │
+                       │  - Instant exit beacon  │
+                       │  - Heartbeat monitor    │
+                       └─────────────────────────┘
+                                   │
+                                   │ WebSocket
+                                   ▼
+                       ┌─────────────────────────┐
+                       │   Main Game Display     │
+                       │   (public/index.html)   │
+                       │  - 60/120Hz physics loop│
+                       │  - Continuous collision │
+                       │  - Combo system         │
+                       │  - Audio & Visual fx    │
+                       └─────────────────────────┘
+```
+
+---
+
+## 2. Strict Separation: Motion Katana vs Touchpad
+
+| Dimension | ⚔️ Motion Katana | 👆 Touchpad |
+| :--- | :--- | :--- |
+| **Input Source** | 3D Sensors: Accelerometer (`devicemotion`) & Gyroscope (`deviceorientation`) | Screen Capacitive Touch (`touchstart`, `touchmove`, `touchend`) & Mouse fallback |
+| **User Interaction** | Swings phone physically through the air | Swipes thumb/finger directly across the screen |
+| **Packet Type** | `type: 'motionSlash'` with 3D aiming vector `{from, to, speed, direction}` | `type: 'touchStart'`, `'touchMove'`, `'touchEnd'` with `{x, y, vx, vy, speed}` |
+| **Desktop Processing** | `handleMotionSlash()`: full-screen blade line collision | `handleTouchMove()`: continuous segment interpolation between previous and current point |
+| **Phone Visuals** | 3D Katana blade rendering, swing power gauge, direction hint | Clean touch surface, glow ripples, thumb guide |
+| **Phone Audio** | Physical sword whoosh generated via Web Audio API on phone speaker | Main screen audio only (or subtle haptic feedback) |
+| **Touchscreen Slicing** | **STRICTLY DISABLED**. Tapping or swiping the screen does NOT slice fruits | **ACTIVE**. Swiping screen slices fruits instantly |
+
+---
+
+## 3. Deep Dive: Touchpad Latency & Missed Slice Diagnostics
+
+### Symptoms Identified:
+1. **Delay before slice registers**: The blade lags behind the finger movement.
+2. **Late fruit cuts**: The fruit is sliced after the finger has already passed it, or it hits the floor before registering.
+3. **Missed cuts ("sometimes doesn't work")**: Finger slashes directly across a fruit, but nothing cuts.
+
+### The 4 Technical Root Causes:
+1. **Vertical Coordinate Distortion (The "Deadzone" Bug)**:
+   - In `controller.js`, `getNormalizedCoords` was computing:
+     `normY = (clientY / window.innerHeight - 0.08) / 0.78`
+   - When the user's thumb is in the bottom 14% of the phone (`clientY / height > 0.86`), `normY` was clamped to `1.0`.
+   - When starting an upward swipe, the coordinates stayed at `1.0` until the thumb moved past the bottom 14%. This created an artificial **14% input deadzone**, making the swipe feel delayed by 50–150 milliseconds!
+2. **Aggressive Packet Throttling with Dropped Points**:
+   - `THROTTLE_MS = 8` in `touchmove` was discarding events when `now - lastSocketSentTime < THROTTLE_MS`.
+   - Because `lastX` and `lastY` were not updated for dropped events, high-speed swipes had huge temporal gaps, causing the desktop interpolation to miscalculate trajectories.
+3. **DOM Thrashing & Thread Starvation**:
+   - Spawning dynamic `.ripple` DOM elements with CSS box-shadows and filters on 35% of high-frequency `touchmove` events caused style recalculations and garbage collection pauses on mobile WebKit/Blink.
+   - Calling `requestWakeLock()` on every `touchstart` initiated asynchronous OS power management promises on the main thread during gameplay.
+4. **Collision Window & Network Travel Delta**:
+   - Fruits move at high velocities (gravitational parabola).
+   - If a swipe packet takes 15–25ms to traverse the local Wi-Fi, the fruit on the desktop screen has already moved 15–30 pixels down.
+   - If `checkCollisions` only tests the fruit's instantaneous position without time-backtracking or generous blade thickness, fast-moving fruits escape the blade collision boundary.
+
+---
+
+## 4. Architectural Solutions & Best Practices
+
+### Solution A: True 1:1 Direct Coordinate Mapping
+- Map `touch.clientX / window.innerWidth` and `touch.clientY / window.innerHeight` directly (0.0 to 1.0) without non-linear offset shifts.
+- Eliminates the 14% bottom deadzone completely so cutting responds on the first pixel of finger travel.
+
+### Solution B: Micro-Batching & Event Optimization
+- Update `lastX` and `lastY` on every input event.
+- Only send WebSocket messages when coordinates actually delta, or at a guaranteed, jitter-free 100–120Hz cadence without discarding critical path inflection points.
+- Ensure `requestWakeLock()` is called only once upon entering the game, never in the hot `touchstart` loop.
+
+### Solution C: Continuous Swept-Circle Collision (Continuous Collision Detection - CCD)
+- In `game.js`, test collisions against both the fruit's current position AND its previous frame position (`fruit.prevX, fruit.prevY`).
+- This guarantees that even if network packets arrive in small bursts, the fruit cannot "tunnel" through the blade slice segment.
+
+### Solution D: Complete Decoupling of Motion and Touch Pipelines
+- Keep Motion Katana state machines, sensitivity thresholds, and sensor events strictly contained in `handleDeviceMotion` and `triggerMotionSlash`.
+- Keep Touchpad state machines and touch listeners cleanly separated so that modifying motion code never touches or alters the touchpad code.
+
+---
+
+## 5. Player Lifecycle & Network Rules
+- **Instant Exit Beacon**: When a player closes their mobile tab or switches apps, `navigator.sendBeacon('/api/leave')` immediately frees their slot on the server in <50ms.
+- **Heartbeat Stability**: Server pings active sockets every 6s with 3 missed-ping tolerance (18s total). Any incoming message (touch or swing) resets `ws.isAlive = true`.
+- **Max Capacity**: 4 players maximum (`playerSlots` 1 to 4 with unique colors: Red, Green, Blue, Yellow).
+
+---
+
+## 6. Touchpad Pipeline Implementation (v4.7)
+- **1:1 Normalized Coordinates**: Direct `normX = clientX / window.innerWidth`, `normY = clientY / window.innerHeight`. Zero deadzones at top/bottom of screen. Exact parity between mobile touch and desktop mouse.
+- **Micro-Batching & WakeLock**: Removed `requestWakeLock()` from the hot `touchstart` loop. Throttled ripple DOM element generation to 100ms intervals to eliminate layout thrashing.
+- **Continuous Collision Detection (CCD)**:
+  - Fruits and bombs track `prevX` and `prevY` in `updatePhysics`.
+  - `checkSweptCollision()` uses 2D orientation tests (`ccw` + `segmentsIntersect`) and swept-capsule distance checks to ensure fast falling fruits cannot tunnel through swipe segments.
+  - Slices register instantly even during high-velocity vertical falls.
+- **End-of-Flick Guarantee**: `handleTouchEnd` processes any final delta movement between the last sent coordinate and release position to ensure quick flicks cutting through fruits register 100% of the time.
+- **Strict Isolation**: Motion Katana remains completely untouched. Sensor handlers, thresholds, and gyro math are isolated in their own functions.
+

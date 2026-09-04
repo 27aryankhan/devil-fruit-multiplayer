@@ -622,15 +622,11 @@ async function requestWakeLock() {
 function setupTouchpad() {
   if (!touchPad) return;
 
-  // Helper to map touch coordinates ergonomics
+  // 1:1 Direct coordinate normalization with ZERO deadzones
+  // Guarantees immediate response on the very first pixel of movement
   const getNormalizedCoords = (clientX, clientY) => {
-    const isPortrait = window.innerHeight > window.innerWidth;
     const normX = Math.max(0, Math.min(1, clientX / window.innerWidth));
-    // In portrait mode, expand vertical reach so comfortable thumb movement covers the entire screen
-    let normY = isPortrait 
-      ? (clientY / window.innerHeight - 0.08) / 0.78
-      : clientY / window.innerHeight;
-    normY = Math.max(0, Math.min(1, normY));
+    const normY = Math.max(0, Math.min(1, clientY / window.innerHeight));
     return { x: normX, y: normY };
   };
 
@@ -641,7 +637,6 @@ function setupTouchpad() {
 
     e.preventDefault();
     if (!isRegistered) return;
-    requestWakeLock();
 
     isTouching = true;
     const touch = e.touches[0];
@@ -650,6 +645,7 @@ function setupTouchpad() {
     lastX = coords.x;
     lastY = coords.y;
     lastTime = Date.now();
+    lastSocketSentTime = lastTime;
 
     sendTouchEvent('touchStart', coords.x, coords.y, 0, 0, 0);
     spawnRipple(touch.clientX, touch.clientY);
@@ -678,10 +674,8 @@ function setupTouchpad() {
 
     sendTouchEvent('touchMove', coords.x, coords.y, vx, vy, speed);
     
-    // Periodically spawn small trail ripples
-    if (Math.random() < 0.35) {
-      spawnRipple(touch.clientX, touch.clientY, true);
-    }
+    // Throttled visual ripple feedback
+    spawnRipple(touch.clientX, touch.clientY, true);
 
     lastX = coords.x;
     lastY = coords.y;
@@ -698,26 +692,33 @@ function setupTouchpad() {
     if (!isRegistered || !isTouching) return;
 
     isTouching = false;
-    sendTouchEvent('touchEnd', lastX, lastY, 0, 0, 0);
+    let endX = lastX;
+    let endY = lastY;
+    if (e && e.changedTouches && e.changedTouches[0]) {
+      const coords = getNormalizedCoords(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+      endX = coords.x;
+      endY = coords.y;
+    }
+    sendTouchEvent('touchEnd', endX, endY, 0, 0, 0);
   };
 
   touchPad.addEventListener('touchend', handleTouchEnd, { passive: false });
   touchPad.addEventListener('touchcancel', handleTouchEnd, { passive: false });
 
-  // Mouse Handlers (Enables testing on Laptop / Desktop browsers as well as touchscreen)
+  // Mouse Handlers (Enables testing on Laptop / Desktop browsers with identical 1:1 precision)
   touchPad.addEventListener('mousedown', (e) => {
     if (controllerMode === 'motion') return;
     if (!isRegistered) return;
     isTouching = true;
 
-    const x = Math.max(0, Math.min(1, e.clientX / window.innerWidth));
-    const y = Math.max(0, Math.min(1, e.clientY / window.innerHeight));
+    const coords = getNormalizedCoords(e.clientX, e.clientY);
 
-    lastX = x;
-    lastY = y;
+    lastX = coords.x;
+    lastY = coords.y;
     lastTime = Date.now();
+    lastSocketSentTime = lastTime;
 
-    sendTouchEvent('touchStart', x, y, 0, 0, 0);
+    sendTouchEvent('touchStart', coords.x, coords.y, 0, 0, 0);
     spawnRipple(e.clientX, e.clientY);
   });
 
@@ -725,39 +726,41 @@ function setupTouchpad() {
     if (controllerMode === 'motion') return;
     if (!isRegistered || !isTouching) return;
 
-    const x = Math.max(0, Math.min(1, e.clientX / window.innerWidth));
-    const y = Math.max(0, Math.min(1, e.clientY / window.innerHeight));
     const now = Date.now();
-
     if (now - lastSocketSentTime < THROTTLE_MS) {
       return;
     }
 
+    const coords = getNormalizedCoords(e.clientX, e.clientY);
     const dt = (now - lastTime) || 1;
-    const vx = (x - lastX) / dt;
-    const vy = (y - lastY) / dt;
+    const vx = (coords.x - lastX) / dt;
+    const vy = (coords.y - lastY) / dt;
     const speed = Math.sqrt(vx * vx + vy * vy);
 
-    sendTouchEvent('touchMove', x, y, vx, vy, speed);
+    sendTouchEvent('touchMove', coords.x, coords.y, vx, vy, speed);
+    spawnRipple(e.clientX, e.clientY, true);
 
-    if (Math.random() < 0.35) {
-      spawnRipple(e.clientX, e.clientY, true);
-    }
-
-    lastX = x;
-    lastY = y;
+    lastX = coords.x;
+    lastY = coords.y;
     lastTime = now;
     lastSocketSentTime = now;
   });
 
-  window.addEventListener('mouseup', () => {
+  window.addEventListener('mouseup', (e) => {
     if (controllerMode === 'motion') {
       isTouching = false;
       return;
     }
     if (!isRegistered || !isTouching) return;
     isTouching = false;
-    sendTouchEvent('touchEnd', lastX, lastY, 0, 0, 0);
+    let endX = lastX;
+    let endY = lastY;
+    if (e && e.clientX !== undefined) {
+      const coords = getNormalizedCoords(e.clientX, e.clientY);
+      endX = coords.x;
+      endY = coords.y;
+    }
+    sendTouchEvent('touchEnd', endX, endY, 0, 0, 0);
   });
 }
 
@@ -780,11 +783,16 @@ function sendTouchEvent(type, x, y, vx, vy, speed) {
   }
 }
 
-// Circular glow ripple on user touch (Only active in Touchpad mode)
+// Circular glow ripple on user touch (Only active in Touchpad mode, throttled to prevent DOM thrashing)
+let lastRippleTime = 0;
 function spawnRipple(clientX, clientY, isMini = false) {
   if (controllerMode === 'motion' || !touchPad) return;
+  const now = Date.now();
+  if (isMini && (now - lastRippleTime < 100)) return;
+  lastRippleTime = now;
+
   const ripple = document.createElement('div');
-  ripple.classList.add('ripple');
+  ripple.className = 'ripple';
   
   const size = isMini ? 35 : 70;
   ripple.style.width = `${size}px`;
@@ -797,7 +805,7 @@ function spawnRipple(clientX, clientY, isMini = false) {
   
   setTimeout(() => {
     ripple.remove();
-  }, 400);
+  }, 350);
 }
 
 // Light vibration tap helper

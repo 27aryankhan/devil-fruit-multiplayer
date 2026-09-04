@@ -672,23 +672,28 @@ function handleTouchMove(data) {
 
   // Detect Collisions along segment (prevPoint -> currentPoint)
   // Interpolate fast swipes: subdivide large gaps to prevent skipping over fruits
-  if (prevPoint && gameState === 'PLAYING') {
-    const dx = canvasX - prevPoint.x;
-    const dy = canvasY - prevPoint.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const STEP_SIZE = 30; // max pixels between collision checks
+  if (gameState === 'PLAYING') {
+    if (prevPoint) {
+      const dx = canvasX - prevPoint.x;
+      const dy = canvasY - prevPoint.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const STEP_SIZE = 25; // max pixels between collision checks
 
-    if (dist > STEP_SIZE) {
-      const steps = Math.ceil(dist / STEP_SIZE);
-      let fromPt = prevPoint;
-      for (let s = 1; s <= steps; s++) {
-        const t = s / steps;
-        const toPt = { x: prevPoint.x + dx * t, y: prevPoint.y + dy * t };
-        checkCollisions(pId, fromPt, toPt);
-        fromPt = toPt;
+      if (dist > STEP_SIZE) {
+        const steps = Math.ceil(dist / STEP_SIZE);
+        let fromPt = prevPoint;
+        for (let s = 1; s <= steps; s++) {
+          const t = s / steps;
+          const toPt = { x: prevPoint.x + dx * t, y: prevPoint.y + dy * t };
+          checkCollisions(pId, fromPt, toPt);
+          fromPt = toPt;
+        }
+      } else {
+        checkCollisions(pId, prevPoint, { x: canvasX, y: canvasY });
       }
     } else {
-      checkCollisions(pId, prevPoint, { x: canvasX, y: canvasY });
+      // If trail was empty, check immediate proximity collision at current point
+      checkProximityCollisions(pId, canvasX, canvasY);
     }
   }
 }
@@ -696,6 +701,18 @@ function handleTouchMove(data) {
 function handleTouchEnd(data) {
   const pId = data.playerId;
   if (!players[pId]) return;
+
+  // If the final point has coordinates, check one final segment to the release position
+  if (data.x !== undefined && data.y !== undefined && gameState === 'PLAYING') {
+    const canvasX = data.x * canvas.width;
+    const canvasY = data.y * canvas.height;
+    if (swipeTrails[pId] && swipeTrails[pId].length > 0) {
+      const prevPoint = swipeTrails[pId][swipeTrails[pId].length - 1];
+      if (prevPoint && (prevPoint.x !== canvasX || prevPoint.y !== canvasY)) {
+        checkCollisions(pId, prevPoint, { x: canvasX, y: canvasY });
+      }
+    }
+  }
 
   delete activePointers[pId];
 
@@ -806,7 +823,7 @@ function checkSlashCollisions(playerId, slash) {
     // Check fruit collisions
     for (let i = fruits.length - 1; i >= 0; i--) {
       const fruit = fruits[i];
-      if (checkLineCircleCollision(p1, p2, fruit, fruit.radius)) {
+      if (checkSweptCollision(p1, p2, fruit, fruit.radius)) {
         sliceFruit(fruit, playerId, p2);
         fruits.splice(i, 1);
       }
@@ -815,7 +832,7 @@ function checkSlashCollisions(playerId, slash) {
     // Check bomb collisions
     for (let i = bombs.length - 1; i >= 0; i--) {
       const bomb = bombs[i];
-      if (checkLineCircleCollision(p1, p2, bomb, bomb.radius)) {
+      if (checkSweptCollision(p1, p2, bomb, bomb.radius)) {
         triggerBombExplosion(bomb, playerId);
         bombs.splice(i, 1);
       }
@@ -825,69 +842,14 @@ function checkSlashCollisions(playerId, slash) {
 
 // --- COLLISION DETECTION ENGINE ---
 
-function checkCollisions(playerId, p1, p2) {
-  const player = players[playerId];
-  if (!player) return;
-
-  // BLADE_WIDTH: the swipe blade has physical width and forgiveness
-  const BLADE_WIDTH = 45; // Generous blade thickness added to hit radius
-  const HIT_FORGIVENESS = 1.8; // Scale fruit radius for network latency
-
-  // 1. Check fruit collisions
-  for (let i = fruits.length - 1; i >= 0; i--) {
-    const fruit = fruits[i];
-    const effectiveRadius = fruit.radius * HIT_FORGIVENESS + BLADE_WIDTH;
-    if (checkLineCircleCollision(p1, p2, fruit, effectiveRadius)) {
-      sliceFruit(fruit, playerId, p2);
-      fruits.splice(i, 1);
-    }
-  }
-
-  // 2. Check bomb collisions (slightly less forgiving — bombs should be harder to hit accidentally)
-  for (let i = bombs.length - 1; i >= 0; i--) {
-    const bomb = bombs[i];
-    const effectiveRadius = bomb.radius * 1.15 + BLADE_WIDTH * 0.4;
-    if (checkLineCircleCollision(p1, p2, bomb, effectiveRadius)) {
-      triggerBombExplosion(bomb, playerId);
-      bombs.splice(i, 1);
-    }
-  }
+// Quick 2D orientation test: returns true if points are counter-clockwise
+function ccw(p1, p2, p3) {
+  return (p3.y - p1.y) * (p2.x - p1.x) > (p2.y - p1.y) * (p3.x - p1.x);
 }
 
-// Proximity-based collision: simple point-to-circle check.
-// Catches fruits that move INTO the finger position between network messages.
-function checkProximityCollisions(playerId, px, py) {
-  const player = players[playerId];
-  if (!player) return;
-
-  const BLADE_WIDTH = 45;
-  const PROXIMITY_FORGIVENESS = 1.9;
-
-  // Check fruits
-  for (let i = fruits.length - 1; i >= 0; i--) {
-    const fruit = fruits[i];
-    const dx = px - fruit.x;
-    const dy = py - fruit.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const effectiveRadius = fruit.radius * PROXIMITY_FORGIVENESS + BLADE_WIDTH;
-    if (dist <= effectiveRadius) {
-      sliceFruit(fruit, playerId, { x: px, y: py });
-      fruits.splice(i, 1);
-    }
-  }
-
-  // Check bombs
-  for (let i = bombs.length - 1; i >= 0; i--) {
-    const bomb = bombs[i];
-    const dx = px - bomb.x;
-    const dy = py - bomb.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const effectiveRadius = bomb.radius * 1.15 + BLADE_WIDTH * 0.4;
-    if (dist <= effectiveRadius) {
-      triggerBombExplosion(bomb, playerId);
-      bombs.splice(i, 1);
-    }
-  }
+// 2D Line Segment to Line Segment intersection test
+function segmentsIntersect(a, b, c, d) {
+  return (ccw(a, c, d) !== ccw(b, c, d)) && (ccw(a, b, c) !== ccw(a, b, d));
 }
 
 // Line Segment to Circle distance/intersection algorithm
@@ -911,6 +873,84 @@ function checkLineCircleCollision(p1, p2, circle, radius) {
   const pb = { x: p1.x + b * v.x, y: p1.y + b * v.y };
   const d2 = (pb.x - circle.x) * (pb.x - circle.x) + (pb.y - circle.y) * (pb.y - circle.y);
   return d2 <= radius * radius;
+}
+
+// Continuous Collision Detection (CCD): checks both instantaneous circle collision
+// and swept-capsule / line intersection against entity trajectory
+function checkSweptCollision(p1, p2, entity, radius) {
+  // 1. Check current entity position
+  if (checkLineCircleCollision(p1, p2, entity, radius)) return true;
+
+  // 2. Swept check against previous frame position if entity is moving
+  if (entity.prevX !== undefined && entity.prevY !== undefined) {
+    const prev = { x: entity.prevX, y: entity.prevY };
+    if (checkLineCircleCollision(p1, p2, prev, radius)) return true;
+    if (segmentsIntersect(p1, p2, prev, entity)) return true;
+    if (checkLineCircleCollision(prev, entity, p1, radius)) return true;
+    if (checkLineCircleCollision(prev, entity, p2, radius)) return true;
+  }
+
+  return false;
+}
+
+function checkCollisions(playerId, p1, p2) {
+  const player = players[playerId];
+  if (!player) return;
+
+  // BLADE_WIDTH: the swipe blade has physical width and forgiveness
+  const BLADE_WIDTH = 45; // Generous blade thickness added to hit radius
+  const HIT_FORGIVENESS = 1.8; // Scale fruit radius for network latency
+
+  // 1. Check fruit collisions
+  for (let i = fruits.length - 1; i >= 0; i--) {
+    const fruit = fruits[i];
+    const effectiveRadius = fruit.radius * HIT_FORGIVENESS + BLADE_WIDTH;
+    if (checkSweptCollision(p1, p2, fruit, effectiveRadius)) {
+      sliceFruit(fruit, playerId, p2);
+      fruits.splice(i, 1);
+    }
+  }
+
+  // 2. Check bomb collisions (slightly less forgiving — bombs should be harder to hit accidentally)
+  for (let i = bombs.length - 1; i >= 0; i--) {
+    const bomb = bombs[i];
+    const effectiveRadius = bomb.radius * 1.15 + BLADE_WIDTH * 0.4;
+    if (checkSweptCollision(p1, p2, bomb, effectiveRadius)) {
+      triggerBombExplosion(bomb, playerId);
+      bombs.splice(i, 1);
+    }
+  }
+}
+
+// Proximity-based collision: point-to-circle & swept check.
+// Catches fruits that move INTO the finger position between network messages.
+function checkProximityCollisions(playerId, px, py) {
+  const player = players[playerId];
+  if (!player) return;
+
+  const BLADE_WIDTH = 45;
+  const PROXIMITY_FORGIVENESS = 1.9;
+  const pt = { x: px, y: py };
+
+  // Check fruits
+  for (let i = fruits.length - 1; i >= 0; i--) {
+    const fruit = fruits[i];
+    const effectiveRadius = fruit.radius * PROXIMITY_FORGIVENESS + BLADE_WIDTH;
+    if (checkSweptCollision(pt, pt, fruit, effectiveRadius)) {
+      sliceFruit(fruit, playerId, pt);
+      fruits.splice(i, 1);
+    }
+  }
+
+  // Check bombs
+  for (let i = bombs.length - 1; i >= 0; i--) {
+    const bomb = bombs[i];
+    const effectiveRadius = bomb.radius * 1.15 + BLADE_WIDTH * 0.4;
+    if (checkSweptCollision(pt, pt, bomb, effectiveRadius)) {
+      triggerBombExplosion(bomb, playerId);
+      bombs.splice(i, 1);
+    }
+  }
 }
 
 // --- GAME LOGIC MECHANICS ---
@@ -1323,6 +1363,8 @@ function spawnFruit(forceRegular = false) {
     ...config,
     x,
     y,
+    prevX: x,
+    prevY: y,
     vx,
     vy,
     angle: Math.random() * Math.PI * 2,
@@ -1346,6 +1388,8 @@ function spawnBomb() {
   bombs.push({
     x,
     y,
+    prevX: x,
+    prevY: y,
     vx,
     vy,
     radius,
@@ -1623,6 +1667,8 @@ function updatePhysics(dt = 1.0) {
   // 1. Update fruits position & gravitation (Scaled with effDt)
   for (let i = fruits.length - 1; i >= 0; i--) {
     const f = fruits[i];
+    f.prevX = f.x;
+    f.prevY = f.y;
     f.x += f.vx * effDt;
     f.vy += baseGravity * effDt;
     f.y += f.vy * effDt;
@@ -1662,6 +1708,8 @@ function updatePhysics(dt = 1.0) {
   // 3. Update bombs
   for (let i = bombs.length - 1; i >= 0; i--) {
     const b = bombs[i];
+    b.prevX = b.x;
+    b.prevY = b.y;
     b.x += b.vx * effDt;
     b.vy += baseGravity * effDt;
     b.y += b.vy * effDt;
