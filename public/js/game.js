@@ -824,7 +824,8 @@ function checkSlashCollisions(playerId, slash) {
     for (let i = fruits.length - 1; i >= 0; i--) {
       const fruit = fruits[i];
       if (checkSweptCollision(p1, p2, fruit, fruit.radius)) {
-        sliceFruit(fruit, playerId, p2);
+        const cutAngle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+        sliceFruit(fruit, playerId, p2, cutAngle);
         fruits.splice(i, 1);
       }
     }
@@ -906,7 +907,8 @@ function checkCollisions(playerId, p1, p2) {
     const fruit = fruits[i];
     const effectiveRadius = fruit.radius * HIT_FORGIVENESS + BLADE_WIDTH;
     if (checkSweptCollision(p1, p2, fruit, effectiveRadius)) {
-      sliceFruit(fruit, playerId, p2);
+      const cutAngle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      sliceFruit(fruit, playerId, p2, cutAngle);
       fruits.splice(i, 1);
     }
   }
@@ -1400,7 +1402,7 @@ function spawnBomb() {
 }
 
   // Slicing logic
-function sliceFruit(fruit, playerId, position) {
+function sliceFruit(fruit, playerId, position, cutAngle = null) {
   const player = players[playerId];
   if (!player) return;
 
@@ -1492,25 +1494,34 @@ function sliceFruit(fruit, playerId, position) {
     });
   }
 
-  // Split fruit halves
-  // Half A (left)
+  // Split fruit halves along the cut angle plane
+  const angle = (cutAngle !== null && !isNaN(cutAngle)) ? cutAngle : (Math.random() > 0.5 ? 0.35 : -0.35);
+
+  // Perpendicular separation velocity vector
+  const sepSpeed = 4.2;
+  const perpX = -Math.sin(angle);
+  const perpY = Math.cos(angle);
+
+  // Half A (one side of cut line)
   slicedFruits.push({
     ...fruit,
-    vx: fruit.vx - 3,
-    vy: fruit.vy - 1,
+    vx: fruit.vx + perpX * sepSpeed,
+    vy: fruit.vy + perpY * sepSpeed,
     angle: fruit.angle,
-    rotationSpeed: -0.07,
-    half: 'left'
+    sliceAngle: angle,
+    rotationSpeed: -0.06,
+    half: 'top'
   });
 
-  // Half B (right)
+  // Half B (other side of cut line)
   slicedFruits.push({
     ...fruit,
-    vx: fruit.vx + 3,
-    vy: fruit.vy - 1,
+    vx: fruit.vx - perpX * sepSpeed,
+    vy: fruit.vy - perpY * sepSpeed,
     angle: fruit.angle,
-    rotationSpeed: 0.07,
-    half: 'right'
+    sliceAngle: angle,
+    rotationSpeed: 0.06,
+    half: 'bottom'
   });
 }
 
@@ -1990,24 +2001,31 @@ function drawJuiceSplat(ctx, cx, cy, radius, color, opacity, rotation) {
 function drawFruitModel(ctx, fruit, isSliced) {
   ctx.save();
   ctx.translate(fruit.x, fruit.y);
-  ctx.rotate(fruit.angle);
+
+  if (isSliced) {
+    const cutAngle = fruit.sliceAngle !== undefined ? fruit.sliceAngle : fruit.angle;
+    ctx.rotate(cutAngle);
+
+    // Split cleanly along the slice angle plane (y = 0 in rotated cut space)
+    ctx.beginPath();
+    if (fruit.half === 'top' || fruit.half === 'left') {
+      ctx.rect(-fruit.radius * 3, -fruit.radius * 3, fruit.radius * 6, fruit.radius * 3);
+    } else {
+      ctx.rect(-fruit.radius * 3, 0, fruit.radius * 6, fruit.radius * 3);
+    }
+    ctx.clip();
+
+    // Rotate internal fruit details (seeds, rind, core) to match tumbling rotation
+    ctx.rotate(fruit.angle - cutAngle);
+  } else {
+    ctx.rotate(fruit.angle);
+  }
 
   // Setup radial gradient shading for 3D sphere volume feel
   const radGrad = ctx.createRadialGradient(
     -fruit.radius * 0.2, -fruit.radius * 0.2, fruit.radius * 0.1,
     0, 0, fruit.radius
   );
-  
-  if (isSliced) {
-    // Sliced fruits are split cleanly down the center axis
-    ctx.beginPath();
-    if (fruit.half === 'left') {
-      ctx.rect(-fruit.radius * 2.5, -fruit.radius * 2.5, fruit.radius * 2.5, fruit.radius * 5);
-    } else {
-      ctx.rect(0, -fruit.radius * 2.5, fruit.radius * 2.5, fruit.radius * 5);
-    }
-    ctx.clip();
-  }
 
   // Draw Specific Fruit Types
   switch (fruit.drawType) {

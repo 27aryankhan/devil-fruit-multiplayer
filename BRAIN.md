@@ -118,3 +118,43 @@ Dojo Blade (Devil Fruits Fruit Ninja) is a real-time multiplayer local-network w
 - **End-of-Flick Guarantee**: `handleTouchEnd` processes any final delta movement between the last sent coordinate and release position to ensure quick flicks cutting through fruits register 100% of the time.
 - **Strict Isolation**: Motion Katana remains completely untouched. Sensor handlers, thresholds, and gyro math are isolated in their own functions.
 
+---
+
+## 7. Motion Katana: 360° Omnidirectional Angle Kinematics & Physics
+
+### The Problem: Why Slices Did Not Match Physical Hand Swing Angles
+1. **Hardcoded 4-Bucket Snapping**:
+   - `triggerMotionSlash` evaluated an `if / else if` ladder that forced every swing into one of only 4 hardcoded buckets:
+     - Pure Vertical Down: `(aimX, 0.05) -> (aimX, 0.95)` (90°)
+     - Pure Vertical Up: `(aimX, 0.95) -> (aimX, 0.05)` (270°)
+     - Pure Horizontal: `(0.05, aimY) -> (0.95, aimY)` (0° or 180°)
+     - Fixed Diagonal Corners: `(0.08, 0.08) -> (0.92, 0.92)` (45°)
+   - Any physical swing at 15°, 30°, 60°, 75°, 120°, 150°, 200°, 315°, etc. was destroyed and clamped into a flat horizontal, vertical, or 45° line.
+2. **The 60% Horizontal Dominance Trap**:
+   - The condition `absH >= absV * 0.75` mapped any angle between -53° and +53° (and 127° to 233°) to a 100% flat horizontal line, capturing over 60% of all player swings regardless of intention.
+3. **Discrete Endpoints vs Continuous Trigonometric Raycasting**:
+   - Instead of projecting a line along the actual angle $\theta$, static screen edges were hardcoded.
+
+### The Physics: 3D Sensor Fusion to 2D Screen Plane
+1. **Phone Sensor Frame vs Screen Canvas Frame**:
+   - Phone Accelerometer: $(a_x, a_y, a_z)$ in device local space.
+   - Phone Gyroscope: $(\omega_\alpha, \omega_\beta, \omega_\gamma)$ angular velocities (deg/sec).
+   - Phone Attitude: $\beta$ (pitch, front-back tilt), $\gamma$ (roll, left-right tilt).
+   - Screen Canvas Frame: $+X$ is Right, $+Y$ is Down (top-left is 0,0).
+2. **Rotation Matrix Projection into User Vertical Slicing Plane**:
+   $$\text{Roll-adjusted horizontal}: a_{\text{horiz}} = a_x \cos\gamma - a_y \sin\gamma$$
+   $$\text{Roll-adjusted longitudinal}: y_{\text{roll}} = a_x \sin\gamma + a_y \cos\gamma$$
+   $$\text{Pitch-projected vertical}: a_{\text{vert}} = y_{\text{roll}} \sin\beta - a_z \cos\beta$$
+3. **Screen Vector Conversion**:
+   - $V_x = a_{\text{horiz}} + k_{\text{gyro}} \cdot \omega_{\text{yaw/roll}}$
+   - $V_y = -a_{\text{vert}} + k_{\text{gyro}} \cdot (-\omega_\beta)$  *(Note: Downward chop has negative $a_{\text{vert}}$ and negative $\omega_\beta$, mapping to positive $+V_y$ down the screen)*
+4. **Exact Continuous Angle Calculation**:
+   $$\theta = \text{Math.atan2}(V_y, V_x) \quad (-\pi \le \theta \le \pi)$$
+   $$\theta_{\text{deg}} = (\theta \times 180 / \pi + 360) \pmod{360}$$
+5. **Continuous Full-Screen Blade Raycasting**:
+   Given blade length $L \approx 1.25$ and aim point $(C_x, C_y)$:
+   $$\text{from} = \left(C_x - \frac{L}{2}\cos\theta, \; C_y - \frac{L}{2}\sin\theta\right)$$
+   $$\text{to} = \left(C_x + \frac{L}{2}\cos\theta, \; C_y + \frac{L}{2}\sin\theta\right)$$
+   This generates an exact blade trajectory matching the physical swing at every degree ($0^\circ$ to $360^\circ$).
+
+

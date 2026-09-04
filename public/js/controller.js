@@ -1104,6 +1104,29 @@ function playPhoneKatanaSwish(speed = 20) {
 window.addEventListener('touchstart', () => initPhoneAudio(), { once: true, passive: true });
 window.addEventListener('mousedown', () => initPhoneAudio(), { once: true, passive: true });
 
+function getAngleLabel(deg) {
+  let arrow = '➔';
+  let name = 'Slash';
+  if (deg >= 337.5 || deg < 22.5) {
+    arrow = '➔'; name = 'Horizontal Right';
+  } else if (deg >= 22.5 && deg < 67.5) {
+    arrow = '↘'; name = 'Down-Right Slash';
+  } else if (deg >= 67.5 && deg < 112.5) {
+    arrow = '⬇'; name = 'Downward Chop';
+  } else if (deg >= 112.5 && deg < 157.5) {
+    arrow = '↙'; name = 'Down-Left Slash';
+  } else if (deg >= 157.5 && deg < 202.5) {
+    arrow = '⬅'; name = 'Horizontal Left';
+  } else if (deg >= 202.5 && deg < 247.5) {
+    arrow = '↖'; name = 'Up-Left Slash';
+  } else if (deg >= 247.5 && deg < 292.5) {
+    arrow = '⬆'; name = 'Upward Cut';
+  } else {
+    arrow = '↗'; name = 'Up-Right Slash';
+  }
+  return `${name} ${deg}° ${arrow}`;
+}
+
 function triggerMotionSlash(ax, ay, az, magnitude, rotRate = {}) {
   const gammaDeg = currentDeviceOrientation.gamma || 0;
   const betaDeg = currentDeviceOrientation.beta || 0;
@@ -1122,7 +1145,7 @@ function triggerMotionSlash(ax, ay, az, magnitude, rotRate = {}) {
   // Effective roll: physical tilt + screen orientation
   const effectiveRoll = (screenAngle !== 0) ? screenAngleRad : gammaRad;
 
-  // 1. Transform (ax, ay) through roll rotation matrix into user's horizontal frame
+  // 1. Transform linear acceleration (ax, ay) through roll rotation matrix into user's horizontal frame
   const cosRoll = Math.cos(effectiveRoll);
   const sinRoll = Math.sin(effectiveRoll);
 
@@ -1138,75 +1161,52 @@ function triggerMotionSlash(ax, ay, az, magnitude, rotRate = {}) {
   const userHoriz = xRoll;
   const userVert = yRoll * sinBeta - az * cosBeta;
 
-  const absH = Math.abs(userHoriz);
-  const absV = Math.abs(userVert);
+  // 3. Sensor Fusion: Blend linear acceleration with gyroscope angular rates
+  // When wrist flicks or arm swings, gyroscope provides instant, zero-lag directionality:
+  // - Downward chop pitches wrist down (rotRate.beta is strongly negative).
+  // - Upward swing pitches wrist up (rotRate.beta is positive).
+  // - Horizontal sweeps produce yaw/roll angular rates.
+  const gyroBeta = rotRate.beta || 0;
+  const gyroYaw = (rotRate.alpha || 0) * sinBeta + (rotRate.gamma || 0) * cosBeta;
 
-  // Is device oriented horizontally (landscape or tilted > 35 deg)?
-  const isHeldHorizontal = Math.abs(gammaDeg) > 35 || Math.abs(screenAngle) === 90 || Math.abs(screenAngle) === 270;
+  // Convert to screen canvas vector space:
+  // Screen X: +Right, -Left
+  // Screen Y: +Down, -Up (Canvas top-left is Y=0, bottom is Y=1)
+  const GYRO_WEIGHT = 0.022; // maps deg/s to m/s^2 equivalent
+  const screenVx = userHoriz + gyroYaw * GYRO_WEIGHT;
+  const screenVy = -userVert + (-gyroBeta) * GYRO_WEIGHT;
 
-  // Gyroscope angular velocity checks:
-  // Downward pitch rotation (rotRate.beta) is negative when wrist flicks down
-  const isHeavyDownPitch = rotRate.beta < -85;
+  // 4. Exact continuous angle in radians (-PI to +PI)
+  let angleRad = Math.atan2(screenVy, screenVx);
+  
+  // Convert to degrees (0 to 360)
+  let angleDeg = Math.round((angleRad * 180 / Math.PI + 360) % 360);
 
-  let from, to, dirLabel;
-  const randomJitter = (Math.random() - 0.5) * 0.08;
-
-  // Real-time Pitch Aiming for Horizontal Slices (aiming hand up cuts top, aiming down cuts bottom)
+  // 5. Aim point (center of the slash) modulated by player's hand positioning
   // betaDeg ranges: >70 (aim high), 45-70 (aim mid), <45 (aim low)
-  const aimY = Math.max(0.18, Math.min(0.82, 0.50 - (betaDeg - 55) * 0.008 + randomJitter));
+  const aimY = Math.max(0.20, Math.min(0.80, 0.50 - (betaDeg - 55) * 0.006));
+  // gammaDeg ranges: aiming hand left cuts left, aiming right cuts right
+  const aimX = Math.max(0.20, Math.min(0.80, 0.50 + (gammaDeg / 60) * 0.20));
 
-  // Real-time Roll/Yaw Aiming for Vertical Chops (aiming hand left cuts left, aiming right cuts right)
-  const aimX = Math.max(0.18, Math.min(0.82, 0.50 + (gammaDeg / 60) * 0.25 + randomJitter));
+  // 6. Blade slice raycasting:
+  // Full-screen edge-to-edge blade length (1.3 in normalized canvas coordinates)
+  const BLADE_SPAN = 1.30;
+  const halfSpan = BLADE_SPAN * 0.5;
 
-  // ACCURATE DIRECTION DISCRIMINATION:
-  // 1. Deliberate Vertical Downward Chop
-  if ((userVert < -3.8 && absV > absH * 1.22) || (isHeavyDownPitch && absH < 4.5)) {
-    from = { x: aimX, y: 0.05 };
-    to = { x: aimX - randomJitter * 0.5, y: 0.95 };
-    dirLabel = 'Downward Chop ⬇';
-  }
-  // 2. Deliberate Vertical Upward Cut
-  else if (userVert > 3.8 && absV > absH * 1.3) {
-    from = { x: aimX, y: 0.95 };
-    to = { x: aimX + randomJitter * 0.5, y: 0.05 };
-    dirLabel = 'Upward Cut ⬆';
-  }
-  // 3. Guaranteed Horizontal Slash (Left <-> Right)
-  // Fires when swinging side-to-side or holding phone horizontally
-  else if (isHeldHorizontal || absH >= absV * 0.75) {
-    if (userHoriz >= 0) {
-      from = { x: 0.05, y: aimY };
-      to = { x: 0.95, y: aimY + randomJitter * 0.5 };
-      dirLabel = 'Horizontal Slash ➔';
-    } else {
-      from = { x: 0.95, y: aimY };
-      to = { x: 0.05, y: aimY + randomJitter * 0.5 };
-      dirLabel = 'Horizontal Slash ⬅';
-    }
-  }
-  // 4. True Diagonal Slash
-  else {
-    const isMovingRight = userHoriz >= 0;
-    const isMovingDown = userVert <= 0;
+  const cosA = Math.cos(angleRad);
+  const sinA = Math.sin(angleRad);
 
-    if (isMovingRight && isMovingDown) {
-      from = { x: 0.08, y: Math.max(0.1, aimY - 0.35) };
-      to = { x: 0.92, y: Math.min(0.9, aimY + 0.35) };
-      dirLabel = 'Diagonal Slash ↘';
-    } else if (isMovingRight && !isMovingDown) {
-      from = { x: 0.08, y: Math.min(0.9, aimY + 0.35) };
-      to = { x: 0.92, y: Math.max(0.1, aimY - 0.35) };
-      dirLabel = 'Diagonal Slash ↗';
-    } else if (!isMovingRight && isMovingDown) {
-      from = { x: 0.92, y: Math.max(0.1, aimY - 0.35) };
-      to = { x: 0.08, y: Math.min(0.9, aimY + 0.35) };
-      dirLabel = 'Diagonal Slash ↙';
-    } else {
-      from = { x: 0.92, y: Math.min(0.9, aimY + 0.35) };
-      to = { x: 0.08, y: Math.max(0.1, aimY - 0.35) };
-      dirLabel = 'Diagonal Slash ↖';
-    }
-  }
+  const from = {
+    x: Math.round((aimX - halfSpan * cosA) * 1000) / 1000,
+    y: Math.round((aimY - halfSpan * sinA) * 1000) / 1000
+  };
+  const to = {
+    x: Math.round((aimX + halfSpan * cosA) * 1000) / 1000,
+    y: Math.round((aimY + halfSpan * sinA) * 1000) / 1000
+  };
+
+  // 7. Human-friendly direction label with exact angle and arrow
+  const dirLabel = getAngleLabel(angleDeg);
 
   // Broadcast motion slash over WebSocket
   if (socket && socket.readyState === WebSocket.OPEN) {
@@ -1216,6 +1216,7 @@ function triggerMotionSlash(ax, ay, az, magnitude, rotRate = {}) {
       color: playerColor,
       from,
       to,
+      angle: angleDeg,
       speed: Math.round(magnitude * 10) / 10,
       direction: dirLabel
     }));
@@ -1223,10 +1224,14 @@ function triggerMotionSlash(ax, ay, az, magnitude, rotRate = {}) {
 
   // Visual & Haptic feedback on phone
   if (katanaBladeVisual) {
+    katanaBladeVisual.style.transform = `rotateZ(${angleDeg}deg)`;
     katanaBladeVisual.classList.add('slash-active');
     setTimeout(() => {
-      if (katanaBladeVisual) katanaBladeVisual.classList.remove('slash-active');
-    }, 180);
+      if (katanaBladeVisual) {
+        katanaBladeVisual.classList.remove('slash-active');
+        katanaBladeVisual.style.transform = '';
+      }
+    }, 220);
   }
 
   if (swingDirectionHint) {
