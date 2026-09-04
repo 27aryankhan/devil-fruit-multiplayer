@@ -49,7 +49,7 @@ Dojo Blade (Devil Fruits Fruit Ninja) is a real-time multiplayer local-network w
 | **Packet Type** | `type: 'motionSlash'` with 3D aiming vector `{from, to, speed, direction}` | `type: 'touchStart'`, `'touchMove'`, `'touchEnd'` with `{x, y, vx, vy, speed}` |
 | **Desktop Processing** | `handleMotionSlash()`: full-screen blade line collision | `handleTouchMove()`: continuous segment interpolation between previous and current point |
 | **Phone Visuals** | 3D Katana blade rendering, swing power gauge, direction hint | Clean touch surface, glow ripples, thumb guide |
-| **Phone Audio** | Physical sword whoosh generated via Web Audio API on phone speaker | Main screen audio only (or subtle haptic feedback) |
+| **Phone Audio** | **Removed / Silent**. Only phone haptic rumble feedback occurs | Silent / Main screen audio only |
 | **Touchscreen Slicing** | **STRICTLY DISABLED**. Tapping or swiping the screen does NOT slice fruits | **ACTIVE**. Swiping screen slices fruits instantly |
 
 ---
@@ -156,5 +156,10 @@ Dojo Blade (Devil Fruits Fruit Ninja) is a real-time multiplayer local-network w
    $$\text{from} = \left(C_x - \frac{L}{2}\cos\theta, \; C_y - \frac{L}{2}\sin\theta\right)$$
    $$\text{to} = \left(C_x + \frac{L}{2}\cos\theta, \; C_y + \frac{L}{2}\sin\theta\right)$$
    This generates an exact blade trajectory matching the physical swing at every degree ($0^\circ$ to $360^\circ$).
+
+6. **Phone Speaker Audio Removal (v4.9)**:
+   - Completely stripped Web Audio API synthesizer (`phoneAudioCtx` and `playPhoneKatanaSwish`) from `controller.js`.
+   - The phone controller remains completely silent during arm swings; all slice audio is handled exclusively by the main game screen (`audio.playMotionKatanaSlash`), while the phone provides subtle haptic vibration.
+
 
 

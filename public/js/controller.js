@@ -1059,51 +1059,6 @@ function handleDeviceMotion(e) {
   }
 }
 
-// ============================================================
-// PHONE SPEAKER AUDIO SYNTHESIZER (Wii-style Hand Sound)
-// ============================================================
-let phoneAudioCtx = null;
-function initPhoneAudio() {
-  if (phoneAudioCtx) return;
-  try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (AudioCtx) {
-      phoneAudioCtx = new AudioCtx();
-    }
-  } catch (e) {}
-}
-
-function playPhoneKatanaSwish(speed = 20) {
-  if (!phoneAudioCtx) initPhoneAudio();
-  if (!phoneAudioCtx) return;
-  try {
-    if (phoneAudioCtx.state === 'suspended') {
-      phoneAudioCtx.resume();
-    }
-    const now = phoneAudioCtx.currentTime;
-    const osc = phoneAudioCtx.createOscillator();
-    const gain = phoneAudioCtx.createGain();
-
-    const pitch = Math.min(2.2, Math.max(0.75, speed / 18));
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(580 * pitch, now);
-    osc.frequency.exponentialRampToValueAtTime(55, now + 0.18);
-
-    gain.gain.setValueAtTime(0.28, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-
-    osc.connect(gain);
-    gain.connect(phoneAudioCtx.destination);
-
-    osc.start(now);
-    osc.stop(now + 0.19);
-  } catch (e) {}
-}
-
-// Unlock audio context on any user tap
-window.addEventListener('touchstart', () => initPhoneAudio(), { once: true, passive: true });
-window.addEventListener('mousedown', () => initPhoneAudio(), { once: true, passive: true });
-
 function getAngleLabel(deg) {
   let arrow = '➔';
   let name = 'Slash';
@@ -1244,9 +1199,6 @@ function triggerMotionSlash(ax, ay, az, magnitude, rotRate = {}) {
       }
     }, 450);
   }
-
-  // Phone speaker sword whoosh sound
-  playPhoneKatanaSwish(magnitude);
 
   // Phone haptic rumble
   if (navigator.vibrate) {
