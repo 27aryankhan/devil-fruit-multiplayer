@@ -161,5 +161,33 @@ Dojo Blade (Devil Fruits Fruit Ninja) is a real-time multiplayer local-network w
    - Completely stripped Web Audio API synthesizer (`phoneAudioCtx` and `playPhoneKatanaSwish`) from `controller.js`.
    - The phone controller remains completely silent during arm swings; all slice audio is handled exclusively by the main game screen (`audio.playMotionKatanaSlash`), while the phone provides subtle haptic vibration.
 
+---
+
+## 8. Ultra-Responsive 1:1 Motion Calibration & Sensor Filtering (v5.0)
+
+### The 3 Remaining Sources of Latency & Angle Distortion:
+1. **Single-Sample Trigger Jitter**:
+   - `triggerMotionSlash` was called on the very first frame where `netMag >= threshold`.
+   - In real-world hand swings, this initial frame represents pre-swing wrist flexing rather than peak kinetic energy. Sampling a single 16ms frame produced noisy, inconsistent angles.
+2. **Reversed Gyroscope Yaw Projection**:
+   - In W3C `DeviceMotionEvent`, rotation around the phone's long vertical axis (when held upright in portrait) is `rotationRate.gamma`, while `rotationRate.alpha` is rotation around the screen normal (Z-axis).
+   - Projecting yaw as `alpha * sinBeta` took the steering-wheel twist instead of horizontal arm sweep. The corrected projection is `omega_yaw = gamma * sinBeta + alpha * cosBeta`.
+3. **Gravity Bleed on Android / Fallback Accelerometers**:
+   - When `e.acceleration` is unavailable, `e.accelerationIncludingGravity` raw components still contain 9.8 m/s² Earth gravity.
+   - Solution: Dynamic component-wise low-pass gravity filter ($g_i = 0.85 \cdot g_i + 0.15 \cdot a_i$) yields true linear acceleration $\vec{a}_{\text{linear}} = \vec{a}_{\text{raw}} - \vec{g}$.
+
+### The Calibration Architecture:
+1. **Rolling Energy-Weighted Stroke Window (4 samples, ~50ms)**:
+   - Maintain a 4-sample ring buffer of $(a_x, a_y, a_z, \text{rotRate})$.
+   - When a swing spike triggers, calculate the momentum vector weighted by kinetic energy across the stroke:
+     $$\vec{V}_{\text{stroke}} = \frac{\sum w_i \cdot \vec{V}_i}{\sum w_i} \quad \text{where } w_i = (\text{netMag}_i)^2 + (\text{gyroSpeed}_i \times 0.05)^2$$
+   - Eliminates single-frame noise without introducing pipeline delay.
+2. **Continuous 1:1 Trajectory Raycasting**:
+   - Continuous angle $\theta = \text{atan2}(V_y, V_x)$ with 0° snapping or bucketing.
+   - Blade endpoints $(from, to)$ span edge-to-edge ($L \approx 1.35$).
+3. **Reduced Cooldown & Dynamic Multi-Slash**:
+   - Cooldown reduced from 260ms to 180ms for fast martial-arts double and triple combos.
+
+
 
 

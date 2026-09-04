@@ -37,11 +37,17 @@ let controllerMode = 'motion';
 let motionSensitivity = 'normal'; // 'normal' (threshold: 11) | 'high' (threshold: 8.5)
 let motionThreshold = 11;
 let lastSwingTime = 0;
-const SWING_COOLDOWN_MS = 260;
+const SWING_COOLDOWN_MS = 180; // Ultra-responsive 180ms cooldown for rapid combo slashes
 let hasMotionPermission = false;
 let isMotionListening = false;
 let currentDeviceOrientation = { alpha: 0, beta: 0, gamma: 0 };
 let peakGaugeValue = 0;
+
+// Rolling 4-sample kinetic momentum ring buffer (~50ms) to filter pre-swing wrist twitch
+let motionRingBuffer = [];
+const MOTION_RING_BUFFER_SIZE = 4;
+// Dynamic component-wise gravity low-pass filter for fallback accelerometers
+let gravityEstimate = { x: 0, y: 0, z: 9.8 };
 
 // Touch state variables
 let isTouching = false;
@@ -984,6 +990,7 @@ function stopMotionListeners() {
   window.removeEventListener('devicemotion', handleDeviceMotion);
   window.removeEventListener('deviceorientation', handleDeviceOrientation);
   isMotionListening = false;
+  motionRingBuffer = [];
   if (gaugeAnimationId) {
     cancelAnimationFrame(gaugeAnimationId);
     gaugeAnimationId = null;
@@ -1008,7 +1015,7 @@ function handleDeviceOrientation(e) {
   }
 }
 
-// Main Acceleration & Katana Swing Detection
+// Main Acceleration & Katana Swing Detection with Dynamic Gravity Isolation and Ring Buffer
 function handleDeviceMotion(e) {
   if (!isRegistered || !e) return;
 
@@ -1020,7 +1027,7 @@ function handleDeviceMotion(e) {
     gamma: rot.gamma || 0
   };
 
-  // Prefer acceleration without gravity if provided, else filter gravity out
+  // Prefer acceleration without gravity if provided, else filter gravity out component-wise
   let ax = 0, ay = 0, az = 0, netMag = 0;
 
   if (e.acceleration && e.acceleration.x !== null) {
@@ -1029,33 +1036,57 @@ function handleDeviceMotion(e) {
     az = e.acceleration.z || 0;
     netMag = Math.sqrt(ax * ax + ay * ay + az * az);
   } else if (e.accelerationIncludingGravity && e.accelerationIncludingGravity.x !== null) {
-    ax = e.accelerationIncludingGravity.x || 0;
-    ay = e.accelerationIncludingGravity.y || 0;
-    az = e.accelerationIncludingGravity.z || 0;
-    const rawMag = Math.sqrt(ax * ax + ay * ay + az * az);
-    netMag = Math.max(0, rawMag - 9.8);
+    const rawX = e.accelerationIncludingGravity.x || 0;
+    const rawY = e.accelerationIncludingGravity.y || 0;
+    const rawZ = e.accelerationIncludingGravity.z || 0;
+    // Component-wise dynamic low-pass filter (alpha=0.85) to isolate Earth gravity
+    gravityEstimate.x = 0.85 * gravityEstimate.x + 0.15 * rawX;
+    gravityEstimate.y = 0.85 * gravityEstimate.y + 0.15 * rawY;
+    gravityEstimate.z = 0.85 * gravityEstimate.z + 0.15 * rawZ;
+    ax = rawX - gravityEstimate.x;
+    ay = rawY - gravityEstimate.y;
+    az = rawZ - gravityEstimate.z;
+    netMag = Math.sqrt(ax * ax + ay * ay + az * az);
+  }
+
+  // Gyroscope angular speed in deg/s
+  const gyroSpeed = Math.sqrt(
+    rotRate.alpha * rotRate.alpha +
+    rotRate.beta * rotRate.beta +
+    rotRate.gamma * rotRate.gamma
+  );
+
+  // Store in rolling 4-sample kinetic momentum buffer (~50ms window leading up to peak)
+  motionRingBuffer.push({
+    ax,
+    ay,
+    az,
+    rotRate,
+    netMag,
+    gyroSpeed,
+    time: Date.now()
+  });
+  if (motionRingBuffer.length > MOTION_RING_BUFFER_SIZE) {
+    motionRingBuffer.shift();
   }
 
   // Update real-time swing power gauge
-  const currentPct = Math.min(100, Math.round((netMag / 30) * 100));
+  const currentPct = Math.min(100, Math.round((Math.max(netMag, gyroSpeed / 15) / 30) * 100));
   if (currentPct > peakGaugeValue) {
     peakGaugeValue = currentPct;
   }
 
-  // Detect Katana Swing spike (combines linear acceleration with gyroscope angular speed)
+  // Ultra-responsive swing spike detection:
+  // Triggers on strong linear stroke, fast wrist rotation flick, or rapid combo slash snap
   const now = Date.now();
-  const gyroSpeed = Math.sqrt(
-    (rotRate.alpha || 0) ** 2 +
-    (rotRate.beta || 0) ** 2 +
-    (rotRate.gamma || 0) ** 2
-  );
-
-  const isSwingSpike = (netMag >= motionThreshold) || (gyroSpeed > 220 && netMag >= 7.5);
+  const isSwingSpike = (netMag >= motionThreshold) ||
+                       (gyroSpeed > 240 && netMag >= 5.0) ||
+                       (gyroSpeed > 380);
 
   if (isSwingSpike && (now - lastSwingTime >= SWING_COOLDOWN_MS)) {
     lastSwingTime = now;
     requestWakeLock();
-    triggerMotionSlash(ax, ay, az, Math.max(netMag, gyroSpeed / 20), rotRate);
+    triggerMotionSlash();
   }
 }
 
@@ -1082,7 +1113,39 @@ function getAngleLabel(deg) {
   return `${name} ${deg}° ${arrow}`;
 }
 
-function triggerMotionSlash(ax, ay, az, magnitude, rotRate = {}) {
+function triggerMotionSlash() {
+  if (motionRingBuffer.length === 0) return;
+
+  // 1. Kinetic Energy-Weighted Momentum Average across the stroke window:
+  // Rather than capturing pre-swing wrist twitch from a single 16ms frame,
+  // we weight the directional acceleration and gyroscope vectors by kinetic energy:
+  // w_i = (netMag_i)^2 + (gyroSpeed_i * 0.05)^2
+  let sumW = 0;
+  let weightedAx = 0, weightedAy = 0, weightedAz = 0;
+  let weightedRotAlpha = 0, weightedRotBeta = 0, weightedRotGamma = 0;
+  let peakMag = 0;
+
+  for (let i = 0; i < motionRingBuffer.length; i++) {
+    const s = motionRingBuffer[i];
+    const w = Math.max(0.01, (s.netMag * s.netMag) + ((s.gyroSpeed * 0.05) ** 2));
+    sumW += w;
+    weightedAx += s.ax * w;
+    weightedAy += s.ay * w;
+    weightedAz += s.az * w;
+    weightedRotAlpha += (s.rotRate.alpha || 0) * w;
+    weightedRotBeta += (s.rotRate.beta || 0) * w;
+    weightedRotGamma += (s.rotRate.gamma || 0) * w;
+    if (s.netMag > peakMag) peakMag = s.netMag;
+    if (s.gyroSpeed / 20 > peakMag) peakMag = s.gyroSpeed / 20;
+  }
+
+  const effAx = weightedAx / sumW;
+  const effAy = weightedAy / sumW;
+  const effAz = weightedAz / sumW;
+  const effAlpha = weightedRotAlpha / sumW;
+  const effBeta = weightedRotBeta / sumW;
+  const effGamma = weightedRotGamma / sumW;
+
   const gammaDeg = currentDeviceOrientation.gamma || 0;
   const betaDeg = currentDeviceOrientation.beta || 0;
   const gammaRad = gammaDeg * (Math.PI / 180);
@@ -1096,56 +1159,50 @@ function triggerMotionSlash(ax, ay, az, magnitude, rotRate = {}) {
     screenAngle = window.orientation;
   }
   const screenAngleRad = screenAngle * (Math.PI / 180);
-
-  // Effective roll: physical tilt + screen orientation
   const effectiveRoll = (screenAngle !== 0) ? screenAngleRad : gammaRad;
 
-  // 1. Transform linear acceleration (ax, ay) through roll rotation matrix into user's horizontal frame
+  // 2. Transform linear acceleration through roll rotation matrix into user's horizontal frame
   const cosRoll = Math.cos(effectiveRoll);
   const sinRoll = Math.sin(effectiveRoll);
 
-  const xRoll = ax * cosRoll - ay * sinRoll;
-  const yRoll = ax * sinRoll + ay * cosRoll;
+  const xRoll = effAx * cosRoll - effAy * sinRoll;
+  const yRoll = effAx * sinRoll + effAy * cosRoll;
 
-  // 2. Account for pitch tilt (beta):
+  // 3. Pitch tilt transformation (beta):
   // When upright (beta ~ 90), vertical movement is along yRoll.
-  // When flat (beta ~ 0), vertical movement is along -az.
+  // When flat (beta ~ 0), vertical movement is along -effAz.
   const sinBeta = Math.sin(betaRad);
   const cosBeta = Math.cos(betaRad);
 
   const userHoriz = xRoll;
-  const userVert = yRoll * sinBeta - az * cosBeta;
+  const userVert = yRoll * sinBeta - effAz * cosBeta;
 
-  // 3. Sensor Fusion: Blend linear acceleration with gyroscope angular rates
-  // When wrist flicks or arm swings, gyroscope provides instant, zero-lag directionality:
-  // - Downward chop pitches wrist down (rotRate.beta is strongly negative).
-  // - Upward swing pitches wrist up (rotRate.beta is positive).
-  // - Horizontal sweeps produce yaw/roll angular rates.
-  const gyroBeta = rotRate.beta || 0;
-  const gyroYaw = (rotRate.alpha || 0) * sinBeta + (rotRate.gamma || 0) * cosBeta;
+  // 4. Corrected W3C Gyroscope Yaw Projection for Portrait Orientation:
+  // In portrait orientation (phone upright, beta ~ 80-90°):
+  // - Sweeping phone horizontally rotates along the phone's vertical spine (rotRate.gamma).
+  // - Twisting like a steering wheel rotates around screen normal (rotRate.alpha).
+  // Correction: omega_yaw = gamma * sinBeta + alpha * cosBeta
+  // Pitch rotation: wrist chop down is negative beta, upward slice is positive beta.
+  const gyroYaw = effGamma * sinBeta + effAlpha * cosBeta;
+  const gyroPitch = effBeta;
 
-  // Convert to screen canvas vector space:
+  // 5. Sensor Fusion: Blend linear vector with angular gyroscope rates
   // Screen X: +Right, -Left
-  // Screen Y: +Down, -Up (Canvas top-left is Y=0, bottom is Y=1)
+  // Screen Y: +Down, -Up (Canvas top-left is 0,0, bottom-right is 1,1)
   const GYRO_WEIGHT = 0.022; // maps deg/s to m/s^2 equivalent
   const screenVx = userHoriz + gyroYaw * GYRO_WEIGHT;
-  const screenVy = -userVert + (-gyroBeta) * GYRO_WEIGHT;
+  const screenVy = -userVert + (-gyroPitch) * GYRO_WEIGHT;
 
-  // 4. Exact continuous angle in radians (-PI to +PI)
+  // 6. Exact continuous angle in radians (-PI to +PI) and degrees (0 to 360)
   let angleRad = Math.atan2(screenVy, screenVx);
-  
-  // Convert to degrees (0 to 360)
   let angleDeg = Math.round((angleRad * 180 / Math.PI + 360) % 360);
 
-  // 5. Aim point (center of the slash) modulated by player's hand positioning
-  // betaDeg ranges: >70 (aim high), 45-70 (aim mid), <45 (aim low)
+  // 7. Aim point (center of the slash) modulated by hand tilt
   const aimY = Math.max(0.20, Math.min(0.80, 0.50 - (betaDeg - 55) * 0.006));
-  // gammaDeg ranges: aiming hand left cuts left, aiming right cuts right
   const aimX = Math.max(0.20, Math.min(0.80, 0.50 + (gammaDeg / 60) * 0.20));
 
-  // 6. Blade slice raycasting:
-  // Full-screen edge-to-edge blade length (1.3 in normalized canvas coordinates)
-  const BLADE_SPAN = 1.30;
+  // 8. Blade slice raycasting (1.32 full edge-to-edge normalized screen span)
+  const BLADE_SPAN = 1.32;
   const halfSpan = BLADE_SPAN * 0.5;
 
   const cosA = Math.cos(angleRad);
@@ -1160,7 +1217,6 @@ function triggerMotionSlash(ax, ay, az, magnitude, rotRate = {}) {
     y: Math.round((aimY + halfSpan * sinA) * 1000) / 1000
   };
 
-  // 7. Human-friendly direction label with exact angle and arrow
   const dirLabel = getAngleLabel(angleDeg);
 
   // Broadcast motion slash over WebSocket
@@ -1172,12 +1228,15 @@ function triggerMotionSlash(ax, ay, az, magnitude, rotRate = {}) {
       from,
       to,
       angle: angleDeg,
-      speed: Math.round(magnitude * 10) / 10,
+      speed: Math.round(peakMag * 10) / 10,
       direction: dirLabel
     }));
   }
 
-  // Visual & Haptic feedback on phone
+  // Clear buffer upon trigger to prepare for rapid combo follow-ups
+  motionRingBuffer = [];
+
+  // Visual & Haptic feedback on phone (phone speaker remains silent!)
   if (katanaBladeVisual) {
     katanaBladeVisual.style.transform = `rotateZ(${angleDeg}deg)`;
     katanaBladeVisual.classList.add('slash-active');
@@ -1186,7 +1245,7 @@ function triggerMotionSlash(ax, ay, az, magnitude, rotRate = {}) {
         katanaBladeVisual.classList.remove('slash-active');
         katanaBladeVisual.style.transform = '';
       }
-    }, 220);
+    }, 200);
   }
 
   if (swingDirectionHint) {
@@ -1197,7 +1256,7 @@ function triggerMotionSlash(ax, ay, az, magnitude, rotRate = {}) {
         swingDirectionHint.classList.remove('slashed');
         swingDirectionHint.innerText = 'Ready! Swing phone in air';
       }
-    }, 450);
+    }, 400);
   }
 
   // Phone haptic rumble
@@ -1205,4 +1264,5 @@ function triggerMotionSlash(ax, ay, az, magnitude, rotRate = {}) {
     navigator.vibrate([30, 20, 45]);
   }
 }
+
 
