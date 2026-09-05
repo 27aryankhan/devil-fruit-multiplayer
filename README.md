@@ -230,4 +230,4 @@ This project requires zero external database dependencies and can be deployed wi
 
 ## 📜 License
 
-This project is licensed under the [MIT License](LICENSE). Built for gamers, anime fans, and developers everywhere.
+This project is licensed under the [MIT License](LICENSE).
