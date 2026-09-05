@@ -180,6 +180,7 @@ devil-fruit-multiplayer/
 ├── package-lock.json          # Dependency lockfile
 ├── Start Dojo Blade.command   # One-click macOS native launcher script
 ├── .gitignore                 # Exclusion rules for secrets, logs, and OS caches
+├── LICENSE                    # MIT open-source license grant
 └── README.md                  # Comprehensive project documentation
 ```
 

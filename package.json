@@ -16,5 +16,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/27aryankhan/devil-fruit-multiplayer.git"
-  }
+  },
+  "author": "Sheikh Aryan Khan",
+  "license": "MIT"
 }
