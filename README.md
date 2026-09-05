@@ -176,7 +176,6 @@ devil-fruit-multiplayer/
 │       └── qrious.min.js      # Client-side QR code generator
 ├── server.js                  # Node.js HTTP server, WebSocket hub & leaderboard API
 ├── leaderboard.json           # Persistent global high score records
-├── render.yaml                # Infrastructure-as-Code Blueprint for Render deployment
 ├── package.json               # Project manifest, dependencies, and engines
 ├── package-lock.json          # Dependency lockfile
 ├── Start Dojo Blade.command   # One-click macOS native launcher script
