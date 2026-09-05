@@ -9,5 +9,12 @@
   },
   "dependencies": {
     "ws": "^8.16.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/27aryankhan/devil-fruit-multiplayer.git"
   }
 }
