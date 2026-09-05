@@ -229,32 +229,13 @@ devil-fruit-multiplayer/
 
 ## 🌐 Deployment
 
-This project requires zero external database dependencies and is fully optimized for cloud and local hosting.
+Deploy your own instance to [Render](https://render.com) with one click:
 
-### One-Click Deploy to Render
-The repository includes a [`render.yaml`](render.yaml) Infrastructure-as-Code Blueprint.
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/27aryankhan/devil-fruit-multiplayer)
 
-1. Click the button below to deploy directly:
-   
-   [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/27aryankhan/devil-fruit-multiplayer)
-
-2. Render will automatically configure:
-   - **Environment**: `Node`
-   - **Build Command**: `npm install`
-   - **Start Command**: `npm start`
-   - **Health Check Path**: `/health`
-
-### Manual Render Setup
-1. Fork or push this repository to GitHub.
-2. In [Render Dashboard](https://dashboard.render.com), click **New + > Web Service**.
-3. Select your repository.
-4. Set **Build Command** to `npm install` and **Start Command** to `npm start`.
-5. Under **Advanced**, add **Health Check Path**: `/health`.
-
-### 💡 Preventing Free-Tier Spin-Down (Keep-Alive)
-Render free web services enter sleep mode after 15 minutes of inactivity. To keep your game instantly responsive 24/7:
-1. Create a free account on [cron-job.org](https://cron-job.org) or [UptimeRobot](https://uptimerobot.com).
-2. Set up a HTTP GET monitor pinging `https://devil-fruit-multiplayer.onrender.com/health` every **10 minutes**.
+Or connect this repository manually as a **Web Service**:
+- **Build Command**: `npm install`
+- **Start Command**: `npm start`
 
 ---
 
