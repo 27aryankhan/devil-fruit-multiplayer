@@ -89,8 +89,8 @@ Slice standard fruits alongside legendary Devil Fruits featuring animated glowin
 
 | Mode | Rules & Objectives |
 | :--- | :--- |
-| **⚔️ Classic Mode** | 3 Lives. Dropping whole fruits costs 1 life. Slicing a hazard bomb ends the game immediately. Pure reflex challenge. |
-| **🧘 Zen Mode** | 90-Second timer. No falling fruit penalties. Bomb strikes deduct 10 points instead of ending the game. High-scoring frenzy. |
+| **Classic Mode** | 3 Lives. Dropping whole fruits costs 1 life. Slicing a hazard bomb ends the game immediately. Pure reflex challenge. |
+| **Zen Mode** | 90-Second timer. No falling fruit penalties. Bomb strikes deduct 10 points instead of ending the game. High-scoring frenzy. |
 
 ---
 
