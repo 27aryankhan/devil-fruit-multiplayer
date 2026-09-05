@@ -96,24 +96,16 @@ Slice standard fruits alongside legendary Devil Fruits featuring animated glowin
 
 ## 🏗️ System Architecture
 
-```text
-                                 ┌──────────────────────────────────────────────┐
-                                 │             Node.js Game Server              │
-                                 │  - Dynamic LAN IP / Host Resolution          │
-                                 │  - Low-Latency WebSocket Hub (ws)            │
-                                 │  - Global Leaderboard REST API & Storage     │
-                                 │  - Input Sanitization & WebSocket Rate Guard │
-                                 └──────────────────────┬───────────────────────┘
-                                                        │
-                              WebSocket (LAN / WAN) ────┴──── WebSocket (LAN / WAN)
-                              ┌──────────────────────┐        ┌──────────────────────┐
-                              │  Main Display Arena  │        │  Mobile Controllers  │
-                              │  - HTML5 Canvas 2D   │        │  - Motion Katana     │
-                              │  - 3D Vector Fruits  │        │  - Touchpad Katana   │
-                              │  - Cut-Plane Physics │        │  - Dynamic Gravity   │
-                              │  - Procedural Audio  │        │  - Haptic Feedback   │
-                              │  (TV / PC Browser)   │        │  (Up to 4 Phones)    │
-                              └──────────────────────┘        └──────────────────────┘
+```mermaid
+flowchart TD
+    Server["🖥️ <b>Node.js Game Server</b><br/>• Dynamic LAN IP / Host Resolution<br/>• Low-Latency WebSocket Hub (ws)<br/>• Global Leaderboard REST API & Storage<br/>• Input Sanitization & WebSocket Rate Guard"]
+
+    Display["🖥️ <b>Main Display Arena</b><br/>• HTML5 Canvas 2D Engine<br/>• 3D Vector Fruit Models<br/>• Angle-Aligned Cut Physics<br/>• Procedural Web Audio Synth<br/><i>(TV / PC Display)</i>"]
+
+    Controller["📱 <b>Mobile Sword Controllers</b><br/>• Motion Katana (360° Gyro Tracking)<br/>• Touchpad Katana (125Hz Stream)<br/>• Dynamic Gravity Low-Pass Filter<br/>• Real-Time Haptic Rumble<br/><i>(Up to 4 Smartphones)</i>"]
+
+    Server <--> |"WebSocket (LAN / WAN)"| Display
+    Server <--> |"WebSocket (LAN / WAN)"| Controller
 ```
 
 ---
