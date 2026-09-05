@@ -142,7 +142,7 @@ npm start
 - **Holding the Phone**: Hold the phone upright in portrait mode facing forward like a sword hilt.
 - **Swinging**: Swing your hand cleanly through the air (horizontal sweep, downward chop, or angled slash).
 - **Visual Feedback**: The on-screen katana blade on your phone rotates to match your physical swing angle in real time and displays your strike angle and directional arrow (e.g. `Down-Right Slash 42° ↘`).
-- **Sensitivity**: Tap the **Sensitivity** button in the top HUD to toggle between `NORMAL` (for energetic room swings) and `HIGH` (for subtle wrist flicks).
+- **Sensitivity**: Tap the **Sensitivity** button (located next to the Swing Power gauge below the katana blade) to toggle between `NORMAL` (for energetic room swings) and `HIGH` (for subtle wrist flicks).
 
 ### Touchpad Katana Guide
 - Drag your finger across the full-screen touchpad.
