@@ -17,15 +17,7 @@
 </p>
 
 <p align="center">
-  🎮 <b>Live Game Arena:</b> <a href="https://devil-fruit-multiplayer.onrender.com">https://devil-fruit-multiplayer.onrender.com</a><br>
-  📱 <b>Mobile Sword Controller:</b> <a href="https://devil-fruit-multiplayer.onrender.com/controller.html">https://devil-fruit-multiplayer.onrender.com/controller.html</a><br>
-  ⚡ <b>Service Health / Ping:</b> <a href="https://devil-fruit-multiplayer.onrender.com/health">https://devil-fruit-multiplayer.onrender.com/health</a>
-</p>
-
-<p align="center">
-  <a href="https://render.com/deploy?repo=https://github.com/27aryankhan/devil-fruit-multiplayer">
-    <img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render">
-  </a>
+  🎮 <b>Live Game:</b> <a href="https://devil-fruit-multiplayer.onrender.com">https://devil-fruit-multiplayer.onrender.com</a>
 </p>
 
 </div>
@@ -229,11 +221,7 @@ devil-fruit-multiplayer/
 
 ## 🌐 Deployment
 
-Deploy your own instance to [Render](https://render.com) with one click:
-
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/27aryankhan/devil-fruit-multiplayer)
-
-Or connect this repository manually as a **Web Service**:
+Deploy to [Render](https://render.com) as a **Web Service**:
 - **Build Command**: `npm install`
 - **Start Command**: `npm start`
 
