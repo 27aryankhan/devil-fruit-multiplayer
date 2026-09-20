@@ -420,9 +420,10 @@ body.mode-motion-active .ripple {
 
 .hud-top {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   pointer-events: auto;
+  width: 100%;
 }
 
 .player-badge {

@@ -6,7 +6,7 @@
   <title>Devil Fruits - Controller</title>
   <link rel="icon" href="/favicon.png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/controller.css?v=6.1">
+  <link rel="stylesheet" href="css/controller.css?v=6.2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
@@ -159,26 +159,8 @@
     <div class="hud-top">
       <div class="player-badge" id="player-badge">
         <span class="badge-dot" id="badge-dot"></span>
-        <span id="player-name">Player X</span>
-        <span id="player-flag" style="font-size: 1rem; margin-left: 2px;"></span>
+        <span id="player-name">Player</span>
       </div>
-      <div class="hud-top-right">
-        <div class="wakelock-badge active" id="wakelock-badge" title="Screen Sleep Lock Active">
-          <span class="wakelock-dot"></span>
-          <span id="wakelock-label">ALWAYS-ON</span>
-        </div>
-        <div class="mode-tag" id="hud-mode">Classic</div>
-      </div>
-    </div>
-
-    <!-- Controller Mode Switcher -->
-    <div class="controller-mode-toggle" id="controller-mode-toggle">
-      <button type="button" class="ctrl-mode-btn active" id="btn-mode-motion" onclick="setControllerMode('motion')">
-        ⚔️ Motion Katana
-      </button>
-      <button type="button" class="ctrl-mode-btn" id="btn-mode-touch" onclick="setControllerMode('touch')">
-        👆 Touchpad
-      </button>
     </div>
 
     <!-- Centered Score / Timer -->
@@ -192,14 +174,6 @@
 
     <!-- Motion Katana Visualizer (Active only in Motion Mode) -->
     <div class="motion-katana-panel hidden" id="motion-katana-panel">
-      <!-- iOS Permission Request Banner -->
-      <div class="motion-perm-banner hidden" id="motion-perm-banner">
-        <div class="perm-title">📱 Motion Sensor Access Required</div>
-        <p class="perm-desc">Tap below to allow Safari motion detection for katana swings.</p>
-        <button type="button" class="action-btn perm-btn" id="btn-grant-motion" onclick="requestMotionPermission()">
-          ⚡ ACTIVATE KATANA SENSORS
-        </button>
-      </div>
 
       <!-- Live Katana Blade & Swing Meter -->
       <div class="katana-blade-container" id="katana-blade-container">
@@ -266,6 +240,6 @@
   </video>
 
   <!-- Load script -->
-  <script src="js/controller.js?v=6.1"></script>
+  <script src="js/controller.js?v=6.2"></script>
 </body>
 </html>
