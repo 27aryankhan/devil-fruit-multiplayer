@@ -337,8 +337,8 @@ body.mode-motion-active .ripple {
 }
 
 .safari-hint-icon {
-  font-size: 1.25rem;
-  line-height: 1;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
   margin-top: 1px;
 }

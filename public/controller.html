@@ -6,7 +6,7 @@
   <title>Devil Fruits - Controller</title>
   <link rel="icon" href="/favicon.png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/controller.css?v=6.3">
+  <link rel="stylesheet" href="css/controller.css?v=6.4">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
@@ -140,9 +140,17 @@
 
         <!-- In-App Camera Browser (SFSafariViewController) Screen Awake Notice -->
         <div id="safari-hint-box" class="safari-hint-box" style="display: none;">
-          <span class="safari-hint-icon">🧭</span>
+          <svg class="safari-hint-icon" viewBox="0 0 24 24" width="24" height="24">
+            <circle cx="12" cy="12" r="9.5" fill="none" stroke="#2997ff" stroke-width="2.2"/>
+            <path fill-rule="evenodd" fill="#2997ff" d="M17.5 6.5 L14 14 L6.5 17.5 L10 10 Z M12 10.3 A1.7 1.7 0 1 0 12 13.7 A1.7 1.7 0 1 0 12 10.3 Z"/>
+          </svg>
           <div class="safari-hint-text">
-            <strong>iPhone Screen Tip:</strong> Tap the <strong>Safari compass icon 🧭</strong> in the bottom-right corner to open in Safari so your screen stays awake during the match!
+            <strong>iPhone Screen Tip:</strong> Tap the blue <strong>Safari compass icon</strong> 
+            <svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align: -2px; display: inline-block; margin: 0 1px;">
+              <circle cx="12" cy="12" r="9.5" fill="none" stroke="#2997ff" stroke-width="2.2"/>
+              <path fill-rule="evenodd" fill="#2997ff" d="M17.5 6.5 L14 14 L6.5 17.5 L10 10 Z M12 10.3 A1.7 1.7 0 1 0 12 13.7 A1.7 1.7 0 1 0 12 10.3 Z"/>
+            </svg>
+            in the bottom-right corner to open in real Safari so your screen stays awake!
           </div>
         </div>
         
@@ -237,6 +245,6 @@
   </video>
 
   <!-- Load script -->
-  <script src="js/controller.js?v=6.3"></script>
+  <script src="js/controller.js?v=6.4"></script>
 </body>
 </html>
