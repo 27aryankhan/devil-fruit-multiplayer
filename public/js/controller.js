@@ -424,6 +424,9 @@ function requestJoin() {
   }
   vibrateTap();
   
+  // Engage Dual-Tier Keep-Awake Engine directly on this user gesture
+  requestWakeLock();
+
   // Try to go fullscreen for immersive sword controller feel
   const docEl = document.documentElement;
   if (docEl.requestFullscreen) {
@@ -508,6 +511,7 @@ function requestPlayAgain() {
   vibrateTap();
   if (gameOverOverlay) gameOverOverlay.classList.add('hidden');
   if (hudContainer) hudContainer.classList.remove('hidden');
+  requestWakeLock();
 
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({
@@ -533,6 +537,7 @@ function requestGoBack() {
 
   const leavingPlayerId = playerId;
   isRegistered = false;
+  releaseWakeLock();
 
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({
@@ -613,16 +618,133 @@ function handleGameSync(data) {
 
 // --- TOUCH & MOUSE INTERFACE & RIPPLE ---
 
-// Request Screen WakeLock to prevent phone screen sleep
+// ============================================================
+// BULLETPROOF SCREEN KEEP-AWAKE SUBSYSTEM (DUAL-TIER ENGINE)
+// ============================================================
+// Tier 1: Native Screen WakeLock API with active 'release' auto-reacquisition
+// Tier 2: Inline muted dummy MP4 video loop (NoSleep technique) for iOS Safari & Android
+// Watchdog: 10-second heartbeat ensuring the display stays awake for 90+ minutes
+
+const NO_SLEEP_MP4_URI = "data:video/mp4;base64,AAAAHGZ0eXBNNFYgAAACAGlzb21pc28yYXZjMQAAAAhmcmVlAAAGF21kYXTeBAAAbGliZmFhYyAxLjI4AABCAJMgBDIARwAAArEGBf//rdxF6b3m2Ui3lizYINkj7u94MjY0IC0gY29yZSAxNDIgcjIgOTU2YzhkOCAtIEguMjY0L01QRUctNCBBVkMgY29kZWMgLSBDb3B5bGVmdCAyMDAzLTIwMTQgLSBodHRwOi8vd3d3LnZpZGVvbGFuLm9yZy94MjY0Lmh0bWwgLSBvcHRpb25zOiBjYWJhYz0wIHJlZj0zIGRlYmxvY2s9MTowOjAgYW5hbHlzZT0weDE6MHgxMTEgbWU9aGV4IHN1Ym1lPTcgcHN5PTEgcHN5X3JkPTEuMDA6MC4wMCBtaXhlZF9yZWY9MSBtZV9yYW5nZT0xNiBjaHJvbWFfbWU9MSB0cmVsbGlzPTEgOHg4ZGN0PTAgY3FtPTAgZGVhZHpvbmU9MjEsMTEgZmFzdF9wc2tpcD0xIGNocm9tYV9xcF9vZmZzZXQ9LTIgdGhyZWFkcz02IGxvb2thaGVhZF90aHJlYWRzPTEgc2xpY2VkX3RocmVhZHM9MCBucj0wIGRlY2ltYXRlPTEgaW50ZXJsYWNlZD0wIGJsdXJheV9jb21wYXQ9MCBjb25zdHJhaW5lZF9pbnRyYT0wIGJmcmFtZXM9MCB3ZWlnaHRwPTAga2V5aW50PTI1MCBrZXlpbnRfbWluPTI1IHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCB2YnZfbWF4cmF0ZT03NjggdmJ2X2J1ZnNpemU9MzAwMCBjcmZfbWF4PTAuMCBuYWxfaHJkPW5vbmUgZmlsbGVyPTAgaXBfcmF0aW89MS40MCBhcT0xOjEuMDAAgAAAAFZliIQL8mKAAKvMnJycnJycnJycnXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXiEASZACGQAjgCEASZACGQAjgAAAAAdBmjgX4GSAIQBJkAIZACOAAAAAB0GaVAX4GSAhAEmQAhkAI4AhAEmQAhkAI4AAAAAGQZpgL8DJIQBJkAIZACOAIQBJkAIZACOAAAAABkGagC/AySEASZACGQAjgAAAAAZBmqAvwMkhAEmQAhkAI4AhAEmQAhkAI4AAAAAGQZrAL8DJIQBJkAIZACOAAAAABkGa4C/AySEASZACGQAjgCEASZACGQAjgAAAAAZBmwAvwMkhAEmQAhkAI4AAAAAGQZsgL8DJIQBJkAIZACOAIQBJkAIZACOAAAAABkGbQC/AySEASZACGQAjgCEASZACGQAjgAAAAAZBm2AvwMkhAEmQAhkAI4AAAAAGQZuAL8DJIQBJkAIZACOAIQBJkAIZACOAAAAABkGboC/AySEASZACGQAjgAAAAAZBm8AvwMkhAEmQAhkAI4AhAEmQAhkAI4AAAAAGQZvgL8DJIQBJkAIZACOAAAAABkGaAC/AySEASZACGQAjgCEASZACGQAjgAAAAAZBmiAvwMkhAEmQAhkAI4AhAEmQAhkAI4AAAAAGQZpAL8DJIQBJkAIZACOAAAAABkGaYC/AySEASZACGQAjgCEASZACGQAjgAAAAAZBmoAvwMkhAEmQAhkAI4AAAAAGQZqgL8DJIQBJkAIZACOAIQBJkAIZACOAAAAABkGawC/AySEASZACGQAjgAAAAAZBmuAvwMkhAEmQAhkAI4AhAEmQAhkAI4AAAAAGQZsAL8DJIQBJkAIZACOAAAAABkGbIC/AySEASZACGQAjgCEASZACGQAjgAAAAAZBm0AvwMkhAEmQAhkAI4AhAEmQAhkAI4AAAAAGQZtgL8DJIQBJkAIZACOAAAAABkGbgCvAySEASZACGQAjgCEASZACGQAjgAAAAAZBm6AnwMkhAEmQAhkAI4AhAEmQAhkAI4AhAEmQAhkAI4AhAEmQAhkAI4AAAAhubW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAABDcAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAzB0cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAA+kAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAALAAAACQAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAPpAAAAAAABAAAAAAKobWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAAB1MAAAdU5VxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAACU21pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAhNzdGJsAAAAr3N0c2QAAAAAAAAAAQAAAJ9hdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAALAAkABIAAAASAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGP//AAAALWF2Y0MBQsAN/+EAFWdCwA3ZAsTsBEAAAPpAADqYA8UKkgEABWjLg8sgAAAAHHV1aWRraEDyXyRPxbo5pRvPAyPzAAAAAAAAABhzdHRzAAAAAAAAAAEAAAAeAAAD6QAAABRzdHNzAAAAAAAAAAEAAAABAAAAHHN0c2MAAAAAAAAAAQAAAAEAAAABAAAAAQAAAIxzdHN6AAAAAAAAAAAAAAAeAAADDwAAAAsAAAALAAAACgAAAAoAAAAKAAAACgAAAAoAAAAKAAAACgAAAAoAAAAKAAAACgAAAAoAAAAKAAAACgAAAAoAAAAKAAAACgAAAAoAAAAKAAAACgAAAAoAAAAKAAAACgAAAAoAAAAKAAAACgAAAAoAAAAKAAAAiHN0Y28AAAAAAAAAHgAAAEYAAANnAAADewAAA5gAAAO0AAADxwAAA+MAAAP2AAAEEgAABCUAAARBAAAEXQAABHAAAASMAAAEnwAABLsAAATOAAAE6gAABQYAAAUZAAAFNQAABUgAAAVkAAAFdwAABZMAAAWmAAAFwgAABd4AAAXxAAAGDQAABGh0cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAACAAAAAAAABDcAAAAAAAAAAAAAAAEBAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAQkAAADcAABAAAAAAPgbWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAAC7gAAAykBVxAAAAAAALWhkbHIAAAAAAAAAAHNvdW4AAAAAAAAAAAAAAABTb3VuZEhhbmRsZXIAAAADi21pbmYAAAAQc21oZAAAAAAAAAAAAAAAJGRpbmYAAAAcZHJlZgAAAAAAAAABAAAADHVybCAAAAABAAADT3N0YmwAAABnc3RzZAAAAAAAAAABAAAAV21wNGEAAAAAAAAAAQAAAAAAAAAAAAIAEAAAAAC7gAAAAAAAM2VzZHMAAAAAA4CAgCIAAgAEgICAFEAVBbjYAAu4AAAADcoFgICAAhGQBoCAgAECAAAAIHN0dHMAAAAAAAAAAgAAADIAAAQAAAAAAQAAAkAAAAFUc3RzYwAAAAAAAAAbAAAAAQAAAAEAAAABAAAAAgAAAAIAAAABAAAAAwAAAAEAAAABAAAABAAAAAIAAAABAAAABgAAAAEAAAABAAAABwAAAAIAAAABAAAACAAAAAEAAAABAAAACQAAAAIAAAABAAAACgAAAAEAAAABAAAACwAAAAIAAAABAAAADQAAAAEAAAABAAAADgAAAAIAAAABAAAADwAAAAEAAAABAAAAEAAAAAIAAAABAAAAEQAAAAEAAAABAAAAEgAAAAIAAAABAAAAFAAAAAEAAAABAAAAFQAAAAIAAAABAAAAFgAAAAEAAAABAAAAFwAAAAIAAAABAAAAGAAAAAEAAAABAAAAGQAAAAIAAAABAAAAGgAAAAEAAAABAAAAGwAAAAIAAAABAAAAHQAAAAEAAAABAAAAHgAAAAIAAAABAAAAHwAAAAQAAAABAAAA4HN0c3oAAAAAAAAAAAAAADMAAAAaAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAACMc3RjbwAAAAAAAAAfAAAALAAAA1UAAANyAAADhgAAA6IAAAO+AAAD0QAAA+0AAAQAAAAEHAAABC8AAARLAAAEZwAABHoAAASWAAAEqQAABMUAAATYAAAE9AAABRAAAAUjAAAFPwAABVIAAAVuAAAFgQAABZ0AAAWwAAAFzAAABegAAAX7AAAGFwAAAGJ1ZHRhAAAAWm1ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAG1kaXJhcHBsAAAAAAAAAAAAAAAALWlsc3QAAAAlqXRvbwAAAB1kYXRhAAAAAQAAAABMYXZmNTUuMzMuMTAw";
+
 let wakeLock = null;
-async function requestWakeLock() {
-  try {
-    if ('wakeLock' in navigator) {
-      wakeLock = await navigator.wakeLock.request('screen');
-    }
-  } catch (err) {
-    console.log('Wake Lock error:', err);
+let wakeLockWatchdog = null;
+let isVideoWakeLockActive = false;
+
+function updateWakeLockBadge(isActive) {
+  const badge = document.getElementById('wakelock-badge');
+  const label = document.getElementById('wakelock-label');
+  if (!badge) return;
+  if (isActive) {
+    badge.classList.remove('standby');
+    badge.classList.add('active');
+    if (label) label.innerText = 'ALWAYS-ON';
+  } else {
+    badge.classList.remove('active');
+    badge.classList.add('standby');
+    if (label) label.innerText = 'STANDBY';
   }
+}
+
+async function requestWakeLock() {
+  // 1. Native Screen Wake Lock API (Tier 1)
+  if ('wakeLock' in navigator) {
+    try {
+      if (!wakeLock || wakeLock.released) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        updateWakeLockBadge(true);
+        console.log('[WakeLock] Native screen wake lock acquired');
+
+        wakeLock.addEventListener('release', () => {
+          console.log('[WakeLock] Native wake lock was released by OS');
+          wakeLock = null;
+          // Instantly re-request if still playing and document is visible
+          if (isRegistered && document.visibilityState === 'visible') {
+            setTimeout(requestWakeLock, 500);
+          } else {
+            updateWakeLockBadge(false);
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('[WakeLock] Native request failed, relying on media keep-awake:', err);
+    }
+  }
+
+  // 2. Universal Media Keep-Awake Video (Tier 2 - iOS Safari & Android NoSleep Video)
+  startVideoWakeLock();
+
+  // 3. Watchdog: ensure lock remains active every 10 seconds
+  startWakeLockWatchdog();
+}
+
+function startVideoWakeLock() {
+  const video = document.getElementById('no-sleep-video');
+  if (!video) return;
+
+  try {
+    if (!video.src || video.src.length < 50) {
+      video.src = NO_SLEEP_MP4_URI;
+    }
+    video.muted = true;
+    video.playsInline = true;
+    video.loop = true;
+    video.setAttribute('playsinline', '');
+    video.setAttribute('webkit-playsinline', '');
+    
+    const playPromise = video.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          isVideoWakeLockActive = true;
+          updateWakeLockBadge(true);
+          console.log('[WakeLock] Media keep-awake video active');
+        })
+        .catch((err) => {
+          console.warn('[WakeLock] Video play waiting for direct gesture:', err);
+        });
+    }
+  } catch (e) {
+    console.warn('[WakeLock] Video setup error:', e);
+  }
+}
+
+function startWakeLockWatchdog() {
+  if (wakeLockWatchdog) return;
+  wakeLockWatchdog = setInterval(() => {
+    if (isRegistered && document.visibilityState === 'visible') {
+      if (!wakeLock || wakeLock.released) {
+        console.log('[WakeLock Watchdog] Re-checking screen wake lock...');
+        requestWakeLock();
+      }
+      // Check video playback health
+      const video = document.getElementById('no-sleep-video');
+      if (video && (video.paused || video.ended)) {
+        video.play().catch(() => {});
+      }
+    }
+  }, 10000);
+}
+
+function releaseWakeLock() {
+  if (wakeLock) {
+    try {
+      wakeLock.release();
+    } catch (e) {}
+    wakeLock = null;
+  }
+  if (wakeLockWatchdog) {
+    clearInterval(wakeLockWatchdog);
+    wakeLockWatchdog = null;
+  }
+  const video = document.getElementById('no-sleep-video');
+  if (video) {
+    try {
+      video.pause();
+    } catch (e) {}
+  }
+  isVideoWakeLockActive = false;
+  updateWakeLockBadge(false);
 }
 
 function setupTouchpad() {
@@ -823,6 +945,7 @@ function vibrateTap() {
 
 function notifyExit() {
   if (!isRegistered) return;
+  releaseWakeLock();
   const leavingPlayerId = playerId;
   isRegistered = false;
 
@@ -855,10 +978,10 @@ let hiddenExitTimer = null;
 // Handle mobile backgrounding, app-switching, screen lock, and return
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
-    // 4-second grace period: avoids kicking player out on brief screen tilt, notifications, or dimming
+    // 45-second grace period: avoids kicking player out on brief notifications, screen dimming, or app switcher
     hiddenExitTimer = setTimeout(() => {
       notifyExit();
-    }, 4000);
+    }, 45000);
   } else if (document.visibilityState === 'visible') {
     if (hiddenExitTimer) {
       clearTimeout(hiddenExitTimer);
@@ -886,6 +1009,7 @@ document.addEventListener('visibilitychange', () => {
 function setControllerMode(mode) {
   vibrateTap();
   controllerMode = mode;
+  requestWakeLock();
 
   if (btnModeTouch) btnModeTouch.classList.toggle('active', mode === 'touch');
   if (btnModeMotion) btnModeMotion.classList.toggle('active', mode === 'motion');

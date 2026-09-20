@@ -421,6 +421,57 @@ body.mode-motion-active .ripple {
   text-transform: uppercase;
 }
 
+.hud-top-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wakelock-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(14, 28, 20, 0.85);
+  border: 1px solid rgba(51, 255, 102, 0.35);
+  color: #33ff66;
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 0 10px rgba(51, 255, 102, 0.2);
+  transition: all 0.3s ease;
+}
+
+.wakelock-badge.standby {
+  background: rgba(30, 25, 18, 0.85);
+  border-color: rgba(255, 170, 0, 0.35);
+  color: #ffaa00;
+  box-shadow: none;
+}
+
+.wakelock-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: currentColor;
+  box-shadow: 0 0 6px currentColor;
+  animation: wakelockPulse 2s infinite ease-in-out;
+}
+
+@keyframes wakelockPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 1;
+    box-shadow: 0 0 10px currentColor;
+  }
+}
+
 /* Controller Mode Segmented Toggle */
 .controller-mode-toggle {
   display: flex;

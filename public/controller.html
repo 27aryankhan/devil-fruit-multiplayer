@@ -6,7 +6,7 @@
   <title>Devil Fruits - Controller</title>
   <link rel="icon" href="/favicon.png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/controller.css?v=5.0">
+  <link rel="stylesheet" href="css/controller.css?v=5.1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
@@ -152,7 +152,13 @@
         <span id="player-name">Player X</span>
         <span id="player-flag" style="font-size: 1rem; margin-left: 2px;"></span>
       </div>
-      <div class="mode-tag" id="hud-mode">Classic</div>
+      <div class="hud-top-right">
+        <div class="wakelock-badge active" id="wakelock-badge" title="Screen Sleep Lock Active">
+          <span class="wakelock-dot"></span>
+          <span id="wakelock-label">ALWAYS-ON</span>
+        </div>
+        <div class="mode-tag" id="hud-mode">Classic</div>
+      </div>
     </div>
 
     <!-- Controller Mode Switcher -->
@@ -244,7 +250,12 @@
     </div>
   </div>
 
+  <!-- Hidden Dummy Video for iOS/Android Hardware Screen Sleep Prevention (NoSleep Fallback) -->
+  <video id="no-sleep-video" playsinline webkit-playsinline loop muted preload="auto"
+         style="position: fixed; top: -9999px; left: -9999px; width: 1px; height: 1px; opacity: 0.001; pointer-events: none; z-index: -9999;">
+  </video>
+
   <!-- Load script -->
-  <script src="js/controller.js?v=5.0"></script>
+  <script src="js/controller.js?v=5.1"></script>
 </body>
 </html>
