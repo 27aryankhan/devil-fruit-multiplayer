@@ -36,6 +36,8 @@ logs/
 *.pid
 *.seed
 *.pid.lock
+leaderboard.json.bak
+leaderboard.json.tmp
 
 # ==========================================
 # OPERATING SYSTEM SPECIFIC FILES (macOS / Windows / Linux)

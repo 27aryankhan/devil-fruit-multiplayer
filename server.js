@@ -197,9 +197,14 @@ function isMaliciousUrl(url) {
 
 // ============================================================
 // ============================================================
-// GLOBAL LEADERBOARD & PERSISTENCE
 // ============================================================
+// GLOBAL LEADERBOARD & PERMANENT RECORD PERSISTENCE
+// ============================================================
+// CRITICAL RULE: Never wipe, delete, or reset player names from the leaderboard.
+// Real players compete globally; all player names and records are permanently saved.
 const LEADERBOARD_FILE = path.join(__dirname, 'leaderboard.json');
+const LEADERBOARD_BAK_FILE = path.join(__dirname, 'leaderboard.json.bak');
+const LEADERBOARD_TMP_FILE = path.join(__dirname, 'leaderboard.json.tmp');
 
 const DEFAULT_LEADERBOARD = {
   classic: [],
@@ -212,33 +217,104 @@ const DEFAULT_LEADERBOARD = {
 
 let leaderboardData = { classic: [], zen: [], stats: { totalMatches: 0, totalFruitsSliced: 0 } };
 
+// Helper to safely merge leaderboard records without losing any player
+function mergeLeaderboardRecords(target, source) {
+  if (!source || typeof source !== 'object') return;
+  ['classic', 'zen'].forEach(mode => {
+    if (Array.isArray(source[mode])) {
+      if (!Array.isArray(target[mode])) target[mode] = [];
+      source[mode].forEach(entry => {
+        if (!entry || !entry.name) return;
+        const normName = String(entry.name).trim().toLowerCase();
+        const existing = target[mode].find(e => e.name && String(e.name).trim().toLowerCase() === normName);
+        if (existing) {
+          if (Number(entry.score) > Number(existing.score)) {
+            existing.score = Number(entry.score);
+            existing.combo = Math.max(Number(existing.combo) || 0, Number(entry.combo) || 0);
+            existing.date = entry.date || existing.date;
+            existing.country = entry.country || existing.country;
+          }
+        } else {
+          target[mode].push({
+            id: entry.id || Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+            name: entry.name,
+            score: Number(entry.score) || 0,
+            combo: Number(entry.combo) || 0,
+            country: entry.country || 'GLOBAL',
+            date: entry.date || new Date().toISOString().split('T')[0]
+          });
+        }
+      });
+      target[mode].sort((a, b) => b.score - a.score);
+    }
+  });
+
+  if (source.stats && typeof source.stats === 'object') {
+    target.stats = target.stats || { totalMatches: 0, totalFruitsSliced: 0 };
+    target.stats.totalMatches = Math.max(target.stats.totalMatches || 0, Number(source.stats.totalMatches) || 0);
+    target.stats.totalFruitsSliced = Math.max(target.stats.totalFruitsSliced || 0, Number(source.stats.totalFruitsSliced) || 0);
+  }
+}
+
 function loadLeaderboard() {
+  let loadedSuccessfully = false;
+
+  // 1. Try reading primary leaderboard file
   try {
     if (fs.existsSync(LEADERBOARD_FILE)) {
       const raw = fs.readFileSync(LEADERBOARD_FILE, 'utf8');
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
-        leaderboardData.classic = Array.isArray(parsed.classic) ? parsed.classic : [];
-        leaderboardData.zen = Array.isArray(parsed.zen) ? parsed.zen : [];
-        leaderboardData.stats = parsed.stats || { totalMatches: 0, totalFruitsSliced: 0 };
+        mergeLeaderboardRecords(leaderboardData, parsed);
+        loadedSuccessfully = true;
       }
-    } else {
-      leaderboardData = { classic: [], zen: [], stats: { totalMatches: 0, totalFruitsSliced: 0 } };
-      saveLeaderboard();
     }
   } catch (err) {
-    console.error('Error loading leaderboard.json:', err);
-    leaderboardData = { classic: [], zen: [], stats: { totalMatches: 0, totalFruitsSliced: 0 } };
+    console.error('Notice: Error parsing primary leaderboard.json, checking backup:', err.message);
+  }
+
+  // 2. Fail-Safe: Check backup file if primary was missing or corrupt
+  try {
+    if (fs.existsSync(LEADERBOARD_BAK_FILE)) {
+      const rawBak = fs.readFileSync(LEADERBOARD_BAK_FILE, 'utf8');
+      const parsedBak = JSON.parse(rawBak);
+      if (parsedBak && typeof parsedBak === 'object') {
+        // Merge backup data to guarantee no player names were lost
+        mergeLeaderboardRecords(leaderboardData, parsedBak);
+        loadedSuccessfully = true;
+      }
+    }
+  } catch (bakErr) {
+    console.error('Notice: Error reading backup leaderboard.json.bak:', bakErr.message);
+  }
+
+  // If newly created or repaired, ensure file is written safely
+  if (!fs.existsSync(LEADERBOARD_FILE) || !loadedSuccessfully) {
+    saveLeaderboard();
   }
 }
 
+// Atomic & Durable Save: Never corrupts or empties leaderboard.json on process exits or restarts
 function saveLeaderboard() {
   try {
-    fs.writeFile(LEADERBOARD_FILE, JSON.stringify(leaderboardData, null, 2), 'utf8', (err) => {
-      if (err) console.error('Error saving leaderboard.json:', err);
-    });
+    const jsonString = JSON.stringify(leaderboardData, null, 2);
+
+    // 1. Write atomically to temporary file first
+    fs.writeFileSync(LEADERBOARD_TMP_FILE, jsonString, 'utf8');
+
+    // 2. Backup existing file to .bak before replacing
+    if (fs.existsSync(LEADERBOARD_FILE)) {
+      try {
+        fs.copyFileSync(LEADERBOARD_FILE, LEADERBOARD_BAK_FILE);
+      } catch (cpErr) {
+        // Non-blocking warning
+      }
+    }
+
+    // 3. Atomic rename guarantees zero file corruption or truncation
+    fs.renameSync(LEADERBOARD_TMP_FILE, LEADERBOARD_FILE);
   } catch (err) {
-    console.error('Error in saveLeaderboard:', err);
+    console.error('Critical: Error in saveLeaderboard:', err);
   }
 }
 
@@ -445,16 +521,31 @@ const server = http.createServer((req, res) => {
 
         if (!leaderboardData[mode]) leaderboardData[mode] = [];
         
-        // Find existing record by player name to keep personal best
+        // Find existing record by player name to preserve personal best
         const existingIdx = leaderboardData[mode].findIndex(
-          e => e.name.trim().toLowerCase() === name.toLowerCase()
+          e => e.name && e.name.trim().toLowerCase() === name.toLowerCase()
         );
 
         if (existingIdx !== -1) {
-          if (score >= leaderboardData[mode][existingIdx].score) {
-            leaderboardData[mode][existingIdx] = newEntry;
+          const current = leaderboardData[mode][existingIdx];
+          // Always preserve player name and update to their all-time personal best
+          if (score >= current.score) {
+            leaderboardData[mode][existingIdx] = {
+              ...current,
+              name, // keep proper clean name
+              score,
+              combo: Math.max(combo, current.combo || 0),
+              country: country || current.country || 'GLOBAL',
+              date: new Date().toISOString().split('T')[0]
+            };
+          } else {
+            // Existing score is higher; keep all-time record and update max combo if higher
+            if (combo > (current.combo || 0)) {
+              current.combo = combo;
+            }
           }
         } else {
+          // New slayer permanently added to the Hall of Slayers
           leaderboardData[mode].push(newEntry);
         }
 

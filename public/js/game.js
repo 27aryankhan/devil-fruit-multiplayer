@@ -89,14 +89,48 @@ function fetchLeaderboard(mode = currentLeaderboardMode) {
   const isFile = window.location.protocol === 'file:';
   const apiBase = isFile ? 'http://localhost:3000' : '';
   
+  // Instant render from local cache if available so names appear with zero delay
+  try {
+    const cached = localStorage.getItem(`df_leaderboard_cache_${mode}`);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed && Array.isArray(parsed.leaderboard) && parsed.leaderboard.length > 0) {
+        const list = document.getElementById('lb-list');
+        if (list && list.querySelectorAll('.lb-row').length === 0) {
+          renderLeaderboard(parsed.leaderboard, parsed.stats);
+        }
+      }
+    }
+  } catch (e) {}
+
   fetch(`${apiBase}/api/leaderboard?mode=${mode}`)
     .then(res => res.json())
     .then(data => {
-      renderLeaderboard(data.leaderboard, data.stats);
+      if (data && Array.isArray(data.leaderboard)) {
+        try {
+          localStorage.setItem(`df_leaderboard_cache_${mode}`, JSON.stringify(data));
+        } catch (e) {}
+        renderLeaderboard(data.leaderboard, data.stats);
+      }
     })
     .catch(err => {
       console.warn('Leaderboard fetch notice:', err);
+      // Fail-Safe: Recover from localStorage cache so player names are never lost from screen
+      try {
+        const cached = localStorage.getItem(`df_leaderboard_cache_${mode}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && Array.isArray(parsed.leaderboard) && parsed.leaderboard.length > 0) {
+            renderLeaderboard(parsed.leaderboard, parsed.stats);
+            return;
+          }
+        }
+      } catch (e) {}
+      // If list already has player rows displayed, NEVER wipe them away
       const list = document.getElementById('lb-list');
+      if (list && list.querySelectorAll('.lb-row').length > 0) {
+        return;
+      }
       if (list) {
         list.innerHTML = '<div class="lb-empty">⚔️ Global Leaderboard Active</div>';
       }
@@ -113,9 +147,12 @@ function renderLeaderboard(items, stats) {
 
   const list = document.getElementById('lb-list');
   if (!list) return;
-  list.innerHTML = '';
 
   if (!items || items.length === 0) {
+    // If the list already has player rows displayed, preserve them
+    if (list.querySelectorAll('.lb-row').length > 0) {
+      return;
+    }
     list.innerHTML = `
       <div class="lb-empty" style="padding: 36px 16px; text-align: center;">
         <span style="font-size: 2rem; display: block; margin-bottom: 8px;">⚔️</span>
@@ -127,6 +164,8 @@ function renderLeaderboard(items, stats) {
     `;
     return;
   }
+
+  list.innerHTML = '';
 
   items.forEach(item => {
     const row = document.createElement('div');

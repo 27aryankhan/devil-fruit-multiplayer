@@ -197,11 +197,24 @@ function detectUserCountry() {
 window.addEventListener('DOMContentLoaded', () => {
   setupTouchpad();
   
-  // Pre-select detected country
+  // Pre-select detected country or restore saved country
   const detected = detectUserCountry();
   if (countrySelect) {
     countrySelect.value = detected;
   }
+
+  // Pre-fill previously saved player name and country for returning players
+  try {
+    const savedName = localStorage.getItem('df_saved_player_name');
+    if (savedName && nameInput) {
+      nameInput.value = savedName;
+      nameInput.style.borderColor = '#33ff66';
+    }
+    const savedCountry = localStorage.getItem('df_saved_country');
+    if (savedCountry && countrySelect) {
+      countrySelect.value = savedCountry;
+    }
+  } catch (e) {}
 
   // Bind form submit
   if (setupForm) {
@@ -481,6 +494,12 @@ function requestJoin() {
   } catch (e) {}
 
   const chosenCountry = countrySelect ? countrySelect.value : detectUserCountry();
+
+  // Permanently save player name and country locally on user's device
+  try {
+    localStorage.setItem('df_saved_player_name', chosenName);
+    localStorage.setItem('df_saved_country', chosenCountry);
+  } catch (e) {}
 
   // Register with the server
   if (socket && socket.readyState === WebSocket.OPEN) {
