@@ -93,6 +93,44 @@ function setInitialMode(mode) {
   controllerMode = mode;
   if (setupChoiceMotion) setupChoiceMotion.classList.toggle('active', mode === 'motion');
   if (setupChoiceTouch) setupChoiceTouch.classList.toggle('active', mode === 'touch');
+  if (mode === 'motion') {
+    requestMotionPermission();
+  }
+}
+
+function testMotionSensors() {
+  vibrateTap();
+  requestMotionPermission();
+  requestWakeLock();
+}
+
+function updateSetupSensorStatus(state) {
+  const dot = document.getElementById('setup-sensor-dot');
+  const text = document.getElementById('setup-sensor-text');
+  const preview = document.getElementById('setup-angle-preview');
+  if (!dot || !text) return;
+
+  if (state === 'granted') {
+    dot.className = 'sensor-status-dot active';
+    text.innerText = '📱 Katana Sensors: ACTIVE 🟢';
+    text.style.color = '#33ff66';
+    if (preview) preview.innerText = 'Tilt phone to test katana blade';
+  } else if (state === 'prompt_required') {
+    dot.className = 'sensor-status-dot';
+    text.innerText = '📱 Sensors: Tap "ENTER" to activate';
+    text.style.color = '#ffaa00';
+    if (preview) preview.innerText = 'iOS Safari requires permission tap';
+  } else if (state === 'denied') {
+    dot.className = 'sensor-status-dot denied';
+    text.innerText = '⚠️ Sensors Denied: Refresh & Allow';
+    text.style.color = '#ff3366';
+    if (preview) preview.innerText = 'Check Safari site settings for Motion';
+  } else if (state === 'unsupported') {
+    dot.className = 'sensor-status-dot denied';
+    text.innerText = '⚠️ Motion Sensors: Not Supported';
+    text.style.color = '#ffaa00';
+    if (preview) preview.innerText = 'Please switch to Touchpad mode';
+  }
 }
 
 // HUD elements
@@ -210,6 +248,28 @@ window.addEventListener('DOMContentLoaded', () => {
         nameInput.style.borderColor = '';
       }
     });
+  }
+
+  // Direct click listener on joinBtn to preserve iOS Safari user activation for sensors
+  if (joinBtn) {
+    joinBtn.addEventListener('click', () => {
+      if (controllerMode === 'motion' && typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function' && !hasMotionPermission) {
+        requestMotionPermission();
+      }
+    });
+  }
+
+  // Check initial motion sensor status on load
+  if (typeof DeviceMotionEvent === 'undefined') {
+    updateSetupSensorStatus('unsupported');
+  } else if (typeof DeviceMotionEvent.requestPermission !== 'function') {
+    // Android or standard browser: permission granted by default
+    hasMotionPermission = true;
+    startMotionListeners();
+    updateSetupSensorStatus('granted');
+  } else {
+    // iOS Safari requires user gesture tap
+    updateSetupSensorStatus('prompt_required');
   }
 
   // Connect to Dojo Server WebSocket
@@ -423,24 +483,32 @@ function requestJoin() {
     joinBtn.innerText = '⚔️ Entering...';
   }
   vibrateTap();
-  
-  // Engage Dual-Tier Keep-Awake Engine directly on this user gesture
+
+  // 1. MUST BE FIRST: On iOS Safari, DeviceMotionEvent.requestPermission() must be invoked
+  // synchronously on user gesture before any other async or fullscreen calls!
+  if (controllerMode === 'motion') {
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function' && !hasMotionPermission) {
+      requestMotionPermission();
+    } else {
+      hasMotionPermission = true;
+      startMotionListeners();
+    }
+  }
+
+  // 2. Start Keep-Awake Engine on user gesture
   requestWakeLock();
 
-  // Try to go fullscreen for immersive sword controller feel
-  const docEl = document.documentElement;
-  if (docEl.requestFullscreen) {
-    docEl.requestFullscreen().catch(() => {});
-  } else if (docEl.webkitRequestFullscreen) {
-    docEl.webkitRequestFullscreen().catch(() => {});
-  }
+  // Try to go fullscreen for immersive sword controller feel (non-blocking)
+  try {
+    const docEl = document.documentElement;
+    if (docEl.requestFullscreen) {
+      docEl.requestFullscreen().catch(() => {});
+    } else if (docEl.webkitRequestFullscreen) {
+      docEl.webkitRequestFullscreen().catch(() => {});
+    }
+  } catch (e) {}
 
   const chosenCountry = countrySelect ? countrySelect.value : detectUserCountry();
-
-  // If user selected Motion Katana, request iOS Safari motion permission directly on this tap gesture!
-  if (controllerMode === 'motion' && typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function' && !hasMotionPermission) {
-    requestMotionPermission();
-  }
 
   // Register with the server
   if (socket && socket.readyState === WebSocket.OPEN) {
@@ -692,13 +760,24 @@ function startVideoWakeLock() {
     video.setAttribute('playsinline', '');
     video.setAttribute('webkit-playsinline', '');
     
+    // Critical for iOS Safari: add timeupdate event listener to manually cycle currentTime
+    // because Safari's AVPlayer stops decoding data-URI videos on end of first loop!
+    if (!video._timeUpdateBound) {
+      video._timeUpdateBound = true;
+      video.addEventListener('timeupdate', () => {
+        if (video.currentTime > 0.5) {
+          video.currentTime = Math.random() * 0.1;
+        }
+      });
+    }
+
     const playPromise = video.play();
     if (playPromise !== undefined) {
       playPromise
         .then(() => {
           isVideoWakeLockActive = true;
           updateWakeLockBadge(true);
-          console.log('[WakeLock] Media keep-awake video active');
+          console.log('[WakeLock] Media keep-awake video active in viewport');
         })
         .catch((err) => {
           console.warn('[WakeLock] Video play waiting for direct gesture:', err);
@@ -1054,21 +1133,34 @@ function requestMotionPermission() {
   if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
     DeviceMotionEvent.requestPermission()
       .then((state) => {
+        console.log('[Motion] Permission state:', state);
         if (state === 'granted') {
           hasMotionPermission = true;
           if (motionPermBanner) motionPermBanner.classList.add('hidden');
           startMotionListeners();
           if (navigator.vibrate) navigator.vibrate([40, 30, 60]);
+          updateSetupSensorStatus('granted');
         } else {
+          console.warn('[Motion] Permission not granted:', state);
           if (motionPermBanner) motionPermBanner.classList.remove('hidden');
+          updateSetupSensorStatus('denied');
         }
       })
       .catch((err) => {
         console.warn('DeviceMotionEvent permission error:', err);
         if (motionPermBanner) motionPermBanner.classList.remove('hidden');
+        updateSetupSensorStatus('error');
       });
   } else {
+    // Android / Desktop / standard WebAPI (no explicit prompt required)
+    hasMotionPermission = true;
     startMotionListeners();
+    updateSetupSensorStatus('granted');
+  }
+
+  // Also request DeviceOrientationEvent permission if available separately on iOS
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission().catch(() => {});
   }
 }
 
@@ -1131,11 +1223,22 @@ function handleDeviceOrientation(e) {
   currentDeviceOrientation.beta = e.beta || 0;
   currentDeviceOrientation.gamma = e.gamma || 0;
 
+  const gamma = e.gamma || 0;
+  const beta = e.beta || 0;
+  const tilt = Math.max(-90, Math.min(90, gamma));
+
   if (katanaBladeVisual) {
     // Allow blade to rotate smoothly with device roll (gamma) up to 90 degrees
-    const gamma = e.gamma || 0;
-    const tilt = Math.max(-90, Math.min(90, gamma));
     katanaBladeVisual.style.transform = `rotateZ(${tilt}deg)`;
+  }
+
+  // Update setup preview if still on setup overlay
+  const preview = document.getElementById('setup-angle-preview');
+  if (preview && !isRegistered) {
+    preview.innerText = `Tilt: ${Math.round(tilt)}° | Pitch: ${Math.round(beta)}° (Sensors OK ✅)`;
+    preview.style.color = '#33ff66';
+    const dot = document.getElementById('setup-sensor-dot');
+    if (dot) dot.className = 'sensor-status-dot active';
   }
 }
 
@@ -1209,7 +1312,6 @@ function handleDeviceMotion(e) {
 
   if (isSwingSpike && (now - lastSwingTime >= SWING_COOLDOWN_MS)) {
     lastSwingTime = now;
-    requestWakeLock();
     triggerMotionSlash();
   }
 }
