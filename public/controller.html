@@ -6,7 +6,7 @@
   <title>Devil Fruits - Controller</title>
   <link rel="icon" href="/favicon.png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/controller.css?v=6.0">
+  <link rel="stylesheet" href="css/controller.css?v=6.1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
@@ -138,13 +138,12 @@
           </div>
         </div>
 
-        <!-- Live Motion Sensor & Awake Status Indicator -->
-        <div class="setup-sensor-card" id="setup-sensor-card" onclick="testMotionSensors()">
-          <div class="sensor-status-row">
-            <span class="sensor-status-dot" id="setup-sensor-dot"></span>
-            <span class="sensor-status-text" id="setup-sensor-text">📱 Motion Sensors: Checking...</span>
+        <!-- In-App Camera Browser (SFSafariViewController) Screen Awake Notice -->
+        <div id="safari-hint-box" class="safari-hint-box" style="display: none;">
+          <span class="safari-hint-icon">🧭</span>
+          <div class="safari-hint-text">
+            <strong>iPhone Screen Tip:</strong> Tap the <strong>Safari compass icon 🧭</strong> in the bottom-right corner to open in Safari so your screen stays awake during the match!
           </div>
-          <div class="sensor-angle-preview" id="setup-angle-preview">Tap here or tilt phone to test katana sensors</div>
         </div>
         
         <!-- Enter Button -->
@@ -267,6 +266,6 @@
   </video>
 
   <!-- Load script -->
-  <script src="js/controller.js?v=6.0"></script>
+  <script src="js/controller.js?v=6.1"></script>
 </body>
 </html>

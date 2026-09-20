@@ -98,38 +98,13 @@ function setInitialMode(mode) {
   }
 }
 
-function testMotionSensors() {
-  vibrateTap();
-  requestMotionPermission();
-  requestWakeLock();
-}
-
-function updateSetupSensorStatus(state) {
-  const dot = document.getElementById('setup-sensor-dot');
-  const text = document.getElementById('setup-sensor-text');
-  const preview = document.getElementById('setup-angle-preview');
-  if (!dot || !text) return;
-
-  if (state === 'granted') {
-    dot.className = 'sensor-status-dot active';
-    text.innerText = '📱 Katana Sensors: ACTIVE 🟢';
-    text.style.color = '#33ff66';
-    if (preview) preview.innerText = 'Tilt phone to test katana blade';
-  } else if (state === 'prompt_required') {
-    dot.className = 'sensor-status-dot';
-    text.innerText = '📱 Sensors: Tap "ENTER" to activate';
-    text.style.color = '#ffaa00';
-    if (preview) preview.innerText = 'iOS Safari requires permission tap';
-  } else if (state === 'denied') {
-    dot.className = 'sensor-status-dot denied';
-    text.innerText = '⚠️ Sensors Denied: Refresh & Allow';
-    text.style.color = '#ff3366';
-    if (preview) preview.innerText = 'Check Safari site settings for Motion';
-  } else if (state === 'unsupported') {
-    dot.className = 'sensor-status-dot denied';
-    text.innerText = '⚠️ Motion Sensors: Not Supported';
-    text.style.color = '#ffaa00';
-    if (preview) preview.innerText = 'Please switch to Touchpad mode';
+// Detect in-app camera browser (SFSafariViewController) where Apple blocks wakeLock
+function checkBrowserEnvironment() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const hasWakeLock = 'wakeLock' in navigator;
+  const hintBox = document.getElementById('safari-hint-box');
+  if (hintBox) {
+    hintBox.style.display = (isIOS && !hasWakeLock) ? 'flex' : 'none';
   }
 }
 
@@ -260,17 +235,14 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // Check initial motion sensor status on load
-  if (typeof DeviceMotionEvent === 'undefined') {
-    updateSetupSensorStatus('unsupported');
-  } else if (typeof DeviceMotionEvent.requestPermission !== 'function') {
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission !== 'function') {
     // Android or standard browser: permission granted by default
     hasMotionPermission = true;
     startMotionListeners();
-    updateSetupSensorStatus('granted');
-  } else {
-    // iOS Safari requires user gesture tap
-    updateSetupSensorStatus('prompt_required');
   }
+
+  // Detect iOS in-app camera browser environment
+  checkBrowserEnvironment();
 
   // Connect to Dojo Server WebSocket
   connectWebSocket();
@@ -726,12 +698,7 @@ async function requestWakeLock() {
         wakeLock.addEventListener('release', () => {
           console.log('[WakeLock] Native wake lock was released by OS');
           wakeLock = null;
-          // Instantly re-request if still playing and document is visible
-          if (isRegistered && document.visibilityState === 'visible') {
-            setTimeout(requestWakeLock, 500);
-          } else {
-            updateWakeLockBadge(false);
-          }
+          updateWakeLockBadge(false);
         });
       }
     } catch (err) {
@@ -746,6 +713,13 @@ async function requestWakeLock() {
   startWakeLockWatchdog();
 }
 
+// Re-acquire wake lock on any user touch/tap during match
+document.addEventListener('touchstart', () => {
+  if (isRegistered && (!wakeLock || wakeLock.released)) {
+    requestWakeLock();
+  }
+}, { passive: true });
+
 function startVideoWakeLock() {
   const video = document.getElementById('no-sleep-video');
   if (!video) return;
@@ -759,17 +733,6 @@ function startVideoWakeLock() {
     video.loop = true;
     video.setAttribute('playsinline', '');
     video.setAttribute('webkit-playsinline', '');
-    
-    // Critical for iOS Safari: add timeupdate event listener to manually cycle currentTime
-    // because Safari's AVPlayer stops decoding data-URI videos on end of first loop!
-    if (!video._timeUpdateBound) {
-      video._timeUpdateBound = true;
-      video.addEventListener('timeupdate', () => {
-        if (video.currentTime > 0.5) {
-          video.currentTime = Math.random() * 0.1;
-        }
-      });
-    }
 
     const playPromise = video.play();
     if (playPromise !== undefined) {
@@ -1230,15 +1193,6 @@ function handleDeviceOrientation(e) {
   if (katanaBladeVisual) {
     // Allow blade to rotate smoothly with device roll (gamma) up to 90 degrees
     katanaBladeVisual.style.transform = `rotateZ(${tilt}deg)`;
-  }
-
-  // Update setup preview if still on setup overlay
-  const preview = document.getElementById('setup-angle-preview');
-  if (preview && !isRegistered) {
-    preview.innerText = `Tilt: ${Math.round(tilt)}° | Pitch: ${Math.round(beta)}° (Sensors OK ✅)`;
-    preview.style.color = '#33ff66';
-    const dot = document.getElementById('setup-sensor-dot');
-    if (dot) dot.className = 'sensor-status-dot active';
   }
 }
 

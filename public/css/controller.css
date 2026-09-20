@@ -316,63 +316,41 @@ body.mode-motion-active .ripple {
   text-shadow: 0 0 10px rgba(255, 170, 0, 0.5);
 }
 
-/* Setup Sensor Live Preview Card */
-.setup-sensor-card {
+/* In-App Camera Browser (SFSafariViewController) Screen Awake Notice */
+.safari-hint-box {
   width: 100%;
-  background: rgba(14, 18, 25, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  padding: 10px 14px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  border-radius: 14px;
+  padding: 10px 12px;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: flex-start;
+  gap: 10px;
   box-sizing: border-box;
   text-align: left;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  animation: fadeInHint 0.3s ease;
 }
 
-.setup-sensor-card:active {
-  background: rgba(22, 28, 40, 0.95);
-  border-color: rgba(255, 170, 0, 0.4);
+@keyframes fadeInHint {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.sensor-status-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.safari-hint-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 
-.sensor-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #ffaa00;
-  box-shadow: 0 0 8px #ffaa00;
-  transition: all 0.3s ease;
+.safari-hint-text {
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: #fde68a;
 }
 
-.sensor-status-dot.active {
-  background-color: #33ff66;
-  box-shadow: 0 0 10px #33ff66;
-}
-
-.sensor-status-dot.denied {
-  background-color: #ff3366;
-  box-shadow: 0 0 10px #ff3366;
-}
-
-.sensor-status-text {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #c0c8d8;
-  letter-spacing: 0.04em;
-}
-
-.sensor-angle-preview {
-  font-size: 0.72rem;
-  color: #8a94a6;
-  font-family: monospace;
+.safari-hint-text strong {
+  color: #ffffff;
 }
 
 .action-btn {
